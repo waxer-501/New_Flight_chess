@@ -1,0 +1,19 @@
+# 编译输出
+out/
+*.class
+*.jar
+*.war
+
+# Eclipse
+.project
+.classpath
+.settings/
+bin/
+
+# IDE
+.idea/
+*.iml
+
+# 系统
+.DS_Store
+Thumbs.db
