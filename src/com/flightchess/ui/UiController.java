@@ -7,6 +7,7 @@ import java.util.UUID;
 import javax.swing.SwingUtilities;
 
 import com.flightchess.core.GameState;
+import com.flightchess.core.PlayerColor;
 import com.flightchess.net.ClientConnection;
 import com.flightchess.net.HostServer;
 import com.flightchess.net.Message;
@@ -121,13 +122,31 @@ public class UiController {
                 openGameWindow();
             }
             if (gameWindow != null) {
-                SwingUtilities.invokeLater(() -> gameWindow.setGameState(state));
+                SwingUtilities.invokeLater(() -> {
+                    gameWindow.setGameState(state);
+                    gameWindow.setRollerIsLocal(false);
+                });
             }
         } else if (type == MessageType.DICE_ROLL_RESULT) {
             Object payload = msg.getPayload();
             if (payload instanceof Integer && gameWindow != null) {
                 int dice = (Integer) payload;
-                SwingUtilities.invokeLater(() -> gameWindow.setInfoText("掷骰结果: " + dice));
+                com.flightchess.core.PlayerColor rollerColor = null;
+                if (currentRoomInfo != null) {
+                    for (com.flightchess.net.PlayerInfo p : currentRoomInfo.getPlayers()) {
+                        if (msg.getPlayerId().equals(p.getPlayerId())) {
+                            rollerColor = p.getColor();
+                            break;
+                        }
+                    }
+                }
+                final com.flightchess.core.PlayerColor color = rollerColor;
+                final boolean rollerIsLocal = (color != null && color == getMyColor());
+                SwingUtilities.invokeLater(() -> {
+                    gameWindow.setInfoText("掷骰结果: " + dice + (rollerIsLocal ? " — 请点击要移动的棋子" : ""));
+                    gameWindow.setLastDiceResult(dice, color);
+                    gameWindow.setRollerIsLocal(rollerIsLocal);
+                });
             }
         }
     }
@@ -150,6 +169,21 @@ public class UiController {
 
     public void requestDiceRoll() {
         send(new Message(MessageType.DICE_ROLL_REQUEST, roomId, playerId, 0L, null));
+    }
+
+    /** 选择要移动的棋子并发送到服务器（掷骰后由用户点击棋子触发）。 */
+    public void requestMove(int pieceIndex) {
+        send(new Message(MessageType.MOVE_REQUEST, roomId, playerId, 0L, pieceIndex));
+    }
+
+    private PlayerColor getMyColor() {
+        if (currentRoomInfo == null) return null;
+        for (com.flightchess.net.PlayerInfo p : currentRoomInfo.getPlayers()) {
+            if (playerId != null && playerId.equals(p.getPlayerId())) {
+                return p.getColor();
+            }
+        }
+        return null;
     }
 }
 

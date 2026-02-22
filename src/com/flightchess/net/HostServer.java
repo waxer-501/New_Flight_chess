@@ -9,6 +9,7 @@ import java.net.Socket;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -46,6 +47,10 @@ public class HostServer {
     /** 已经被分配过的颜色集合 */
     private final Set<PlayerColor> usedColors = Collections.synchronizedSet(new HashSet<>());
     private final ExecutorService executor = Executors.newCachedThreadPool();
+
+    /** 掷骰后等待该玩家选择棋子：点数与掷骰者 id，选子并移动后清零。 */
+    private volatile Integer pendingDiceResult = null;
+    private volatile String pendingRollerId = null;
 
     private volatile boolean running = false;
 
@@ -175,8 +180,9 @@ public class HostServer {
                     handleDiceRoll(msg);
                     break;
                 case MOVE_REQUEST:
+                    handleMoveRequest(msg);
+                    break;
                 case PING:
-                    // TODO: 后续补充具体逻辑
                     break;
                 default:
                     break;
@@ -311,18 +317,37 @@ public class HostServer {
             }
             gameState.setConsecutiveSixCount(actorColor, count);
 
-            int pieceIndex = aiController.choosePiece(gameState, actorColor, dice);
-            boolean extraTurn = false;
-            if (pieceIndex >= 0) {
-                MoveResult result = ruleEngine.movePiece(gameState, actorColor, pieceIndex, dice);
-                extraTurn = result.isExtraTurn();
-            }
+            pendingDiceResult = dice;
+            pendingRollerId = msg.getPlayerId();
+            broadcast(new Message(MessageType.DICE_ROLL_RESULT, roomId, msg.getPlayerId(), 0L, dice));
+        }
 
-            if (!extraTurn) {
+        private void handleMoveRequest(Message msg) {
+            if (gameState == null || pendingDiceResult == null || pendingRollerId == null) {
+                return;
+            }
+            if (!msg.getPlayerId().equals(pendingRollerId)) {
+                return;
+            }
+            Object payload = msg.getPayload();
+            if (!(payload instanceof Integer)) {
+                return;
+            }
+            int pieceIndex = (Integer) payload;
+            PlayerColor actorColor = playerColors.get(pendingRollerId);
+            if (actorColor == null) {
+                return;
+            }
+            List<Integer> movable = ruleEngine.listMovablePieces(gameState, actorColor, pendingDiceResult);
+            if (movable == null || !movable.contains(pieceIndex)) {
+                return;
+            }
+            MoveResult result = ruleEngine.movePiece(gameState, actorColor, pieceIndex, pendingDiceResult);
+            pendingDiceResult = null;
+            pendingRollerId = null;
+            if (!result.isExtraTurn()) {
                 rotateTurn();
             }
-
-            broadcast(new Message(MessageType.DICE_ROLL_RESULT, roomId, msg.getPlayerId(), 0L, dice));
             broadcast(new Message(MessageType.GAME_STATE_SNAPSHOT, roomId, msg.getPlayerId(), 0L, gameState));
         }
 

@@ -33,15 +33,15 @@ public class AIController {
             return -1;
         }
 
-        // 简化：直接选择外圈位置最大的那颗棋子（最靠前）。
+        // 掷到 6 时优先让基地里的棋子起飞；否则选外圈最靠前的棋子。
+        int takeoffCandidate = -1;
         int bestIndex = -1;
         int bestPos = -1;
         for (int idx : movable) {
             Piece piece = player.getPieces().get(idx);
             if (piece.isInWaitingArea()) {
-                // 起飞候选，暂存但优先级低于已有外圈棋子。
-                if (bestIndex == -1) {
-                    bestIndex = idx;
+                if (takeoffCandidate == -1) {
+                    takeoffCandidate = idx;
                 }
             } else if (piece.getCellType() == CellType.OUTER) {
                 int pos = piece.getPositionIndex();
@@ -51,8 +51,13 @@ public class AIController {
                 }
             }
         }
-
-        return bestIndex;
+        if (dice == 6 && takeoffCandidate >= 0) {
+            return takeoffCandidate;
+        }
+        if (bestIndex >= 0) {
+            return bestIndex;
+        }
+        return takeoffCandidate;
     }
 }
 

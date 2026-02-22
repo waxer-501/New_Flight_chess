@@ -14,6 +14,7 @@ public class Piece implements Serializable {
     /**
      * 所在区域类型：
      * - OUTER: 外圈，positionIndex 为 0~51
+     * - TAKEOFF: 起飞格（先进入起飞格，再摇骰从此格出发）
      * - CENTER_PATH / CENTER: 突然死亡模式下使用的内部路径
      * - WAITING_AREA: 等待复活区
      */
@@ -55,6 +56,10 @@ public class Piece implements Serializable {
 
     public boolean isInWaitingArea() {
         return cellType == CellType.WAITING_AREA;
+    }
+
+    public boolean isInTakeoffArea() {
+        return cellType == CellType.TAKEOFF;
     }
 }
 

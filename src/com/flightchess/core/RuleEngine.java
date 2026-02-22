@@ -46,7 +46,7 @@ public class RuleEngine {
 
     /**
      * 判断某颗棋子在给定骰子值下是否可以移动。
-     * 目前采用简化逻辑：等待复活区只能在掷出 6 时起飞，其余在外圈上的棋子总是可以向前行进。
+     * 等待区只有掷 6 可进入起飞格；起飞格任意 1~6 可出发；外圈任意正数可前进。
      */
     public boolean canMovePiece(GameState state, PlayerColor color, Piece piece, int dice) {
         if (state.isPlayerDead(color)) {
@@ -54,22 +54,21 @@ public class RuleEngine {
         }
 
         if (piece.isInWaitingArea()) {
-            // 等待复活区 / 基地：只有掷出 6 才能起飞。
             return dice == 6;
         }
+        if (piece.isInTakeoffArea()) {
+            return dice >= 1 && dice <= 6;
+        }
 
-        // 外圈与突然死亡模式下的更复杂规则，可进一步细化。
         return dice > 0;
     }
 
     /**
      * 执行一次移动，返回是否获得额外回合（掷到 6 或吃子等）。
      *
-     * 为了简化，该方法只处理：
-     * - 起飞：从等待复活区到本方起飞格；
-     * - 外圈移动：顺时针前进 dice 步；
-     * - 吃子：若落点有敌方棋子，则送入等待复活区；
-     * - 连续两次 6 复活：计数逻辑交由上层根据骰子结果处理，这里只提供一个工具方法。
+     * - 等待区 + 掷 6：进入本方起飞格（TAKEOFF），可再掷一次；
+     * - 起飞格 + 任意骰子：从起飞格出发，走 dice 步进入外圈（第 1 步到 startIndex，再走 dice-1 步），可吃子；
+     * - 外圈：顺时针 dice 步，可吃子。
      */
     public MoveResult movePiece(GameState state, PlayerColor color, int pieceIndex, int dice) {
         Player player = state.getPlayer(color);
@@ -87,21 +86,33 @@ public class RuleEngine {
 
         boolean extraTurn = false;
         boolean captured = false;
+        int startIndex = BoardConfig.getStartIndex(color);
 
         if (piece.isInWaitingArea()) {
-            // 起飞
-            int startIndex = BoardConfig.getStartIndex(color);
-            piece.setCellType(CellType.OUTER);
-            piece.setPositionIndex(startIndex);
-            // 起飞后根据规则可以再掷一次。
+            // 摇到 6 并选择飞机：先进入起飞格，不直接上外圈
+            piece.setCellType(CellType.TAKEOFF);
+            piece.setPositionIndex(BoardConfig.getTakeoffIndex(color));
             extraTurn = true;
+        } else if (piece.isInTakeoffArea()) {
+            // 从起飞格出发：第 1 步到 startIndex，再走 dice-1 步
+            int to = BoardConfig.moveForwardOnOuter(startIndex, dice - 1);
+            Set<Piece> capturedPieces = getPiecesAtOuterIndex(state, to, color, false);
+            if (!capturedPieces.isEmpty()) {
+                captured = true;
+                for (Piece enemy : capturedPieces) {
+                    enemy.setCellType(CellType.WAITING_AREA);
+                    enemy.setPositionIndex(-1);
+                }
+            }
+            piece.setCellType(CellType.OUTER);
+            piece.setPositionIndex(to);
+            if (dice == 6 || captured) {
+                extraTurn = true;
+            }
         } else if (piece.getCellType() == CellType.OUTER) {
             int from = piece.getPositionIndex();
             int to = BoardConfig.moveForwardOnOuter(from, dice);
 
-            // TODO: 这里未来可以插入颜色格跳跃 / 航道 / 双倍区等更复杂逻辑。
-
-            // 先处理吃子：检查落点是否有敌方棋子。
             Set<Piece> capturedPieces = getPiecesAtOuterIndex(state, to, color, false);
             if (!capturedPieces.isEmpty()) {
                 captured = true;
@@ -113,14 +124,34 @@ public class RuleEngine {
 
             piece.setPositionIndex(to);
 
-            // 掷到 6 或吃子都可以再掷一次。
             if (dice == 6 || captured) {
                 extraTurn = true;
             }
         }
 
-        // 检查是否有人死亡 / 触发突然死亡模式，由上层根据 GameState.getActivePieceCount() 等进行判断。
         return MoveResult.success(extraTurn);
+    }
+
+    /**
+     * 返回指定外圈格子上当前有几颗棋子（包含所有玩家）。
+     *
+     * @param state      当前状态
+     * @param outerIndex 外圈索引
+     * @return 该外圈格子上的棋子数量
+     */
+    public int getPieceCountAtOuterIndex(GameState state, int outerIndex) {
+        if (state == null) {
+            return 0;
+        }
+        int count = 0;
+        for (Player p : state.getPlayersInOrder()) {
+            for (Piece piece : p.getPieces()) {
+                if (piece.getCellType() == CellType.OUTER && piece.getPositionIndex() == outerIndex) {
+                    count++;
+                }
+            }
+        }
+        return count;
     }
 
     /**

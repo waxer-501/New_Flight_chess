@@ -8,12 +8,8 @@ import java.util.Set;
 /**
  * 棋盘坐标与特殊格子定义。
  *
- * 为了便于实现，先以常量表的形式固化：
- * - 外圈 52 格：索引 0~51，顺时针。
- * - 每方起飞格：GREEN=0, RED=13, BLUE=26, YELLOW=39。
- * - 每方外圈区间：各占 13 格。
- *
- * 关于颜色格、航道等，更复杂的位置可后续通过常量数组补充。
+ * 外圈 52 格顺时针：0~12 下，13~25 左，26~38 上，39~51 右（与 GameBoardPanel 绘制一致）。
+ * 出生点：左上黄、右上蓝、右下红、左下绿；起飞格为各角与外圈相接的那一格。
  */
 public final class BoardConfig {
 
@@ -26,25 +22,34 @@ public final class BoardConfig {
     /** 每方外圈 1/4 段长度。 */
     public static final int QUARTER_LENGTH = OUTER_CELL_COUNT / 4; // 13
 
-    /** 每方起飞格索引。 */
+    /** 每方“出发到外圈”的起始索引（与出生点所在角相邻的外圈格）。 */
     private static final Map<PlayerColor, Integer> START_INDEX = new EnumMap<>(PlayerColor.class);
+    /** 每方“起飞格”逻辑索引（独立于外圈，使用负值避免冲突）。 */
+    private static final Map<PlayerColor, Integer> TAKEOFF_INDEX = new EnumMap<>(PlayerColor.class);
 
-    /** 每方所属外圈区间起始索引。 */
+    /** 每方所属外圈区间起始索引（含起飞格的那一段 13 格）。 */
     private static final Map<PlayerColor, Integer> QUARTER_START = new EnumMap<>(PlayerColor.class);
 
     /** 双倍区（死亡后激活）映射：玩家 -> 该玩家死亡时激活的外圈格集合。 */
     private static final Map<PlayerColor, Set<Integer>> DOUBLE_ZONE = new EnumMap<>(PlayerColor.class);
 
     static {
-        START_INDEX.put(PlayerColor.GREEN, 0);
-        START_INDEX.put(PlayerColor.RED, 13);
-        START_INDEX.put(PlayerColor.BLUE, 26);
-        START_INDEX.put(PlayerColor.YELLOW, 39);
+        // 起飞格：左下绿=12，右下红=51，右上蓝=38，左上黄=25（各角与外圈相接）
+        START_INDEX.put(PlayerColor.GREEN, 3);   // 左下
+        START_INDEX.put(PlayerColor.RED, 52);     // 右下
+        START_INDEX.put(PlayerColor.BLUE, 39);    // 右上
+        START_INDEX.put(PlayerColor.YELLOW, 16);  // 左上
+        // 逻辑起飞格索引（非外圈）：黄=-1，蓝=-2，红=-3，绿=-4
+        TAKEOFF_INDEX.put(PlayerColor.YELLOW, -1);
+        TAKEOFF_INDEX.put(PlayerColor.BLUE, -2);
+        TAKEOFF_INDEX.put(PlayerColor.RED, -3);
+        TAKEOFF_INDEX.put(PlayerColor.GREEN, -4);
 
+        // 每方 13 格区间：绿 0~12(下)，红 39~51(右)，蓝 26~38(上)，黄 13~25(左)
         QUARTER_START.put(PlayerColor.GREEN, 0);
-        QUARTER_START.put(PlayerColor.RED, 13);
+        QUARTER_START.put(PlayerColor.RED, 39);
         QUARTER_START.put(PlayerColor.BLUE, 26);
-        QUARTER_START.put(PlayerColor.YELLOW, 39);
+        QUARTER_START.put(PlayerColor.YELLOW, 13);
 
         for (PlayerColor color : PlayerColor.ordered()) {
             int start = QUARTER_START.get(color);
@@ -58,6 +63,10 @@ public final class BoardConfig {
 
     public static int getStartIndex(PlayerColor color) {
         return START_INDEX.get(color);
+    }
+
+    public static int getTakeoffIndex(PlayerColor color) {
+        return TAKEOFF_INDEX.get(color);
     }
 
     public static int getQuarterStart(PlayerColor color) {
