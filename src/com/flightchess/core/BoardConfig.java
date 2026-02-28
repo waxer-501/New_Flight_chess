@@ -100,6 +100,18 @@ public final class BoardConfig {
     }
 
     /**
+     * 获取外圈某格子的颜色（与 GameBoardPanel 绘制一致：0~51 格按 GREEN,RED,BLUE,YELLOW 循环）。
+     * 用于规则「落点与棋子同色则再前进四格」。
+     */
+    public static PlayerColor getCellColorAtOuterIndex(int outerIndex) {
+        if (outerIndex < 0 || outerIndex >= OUTER_CELL_COUNT) {
+            return null;
+        }
+        PlayerColor[] order = PlayerColor.ordered();
+        return order[outerIndex % 4];
+    }
+
+    /**
      * 判断某外圈索引是否处于指定玩家的 1/4 段内。
      */
     public static boolean isInQuarter(PlayerColor color, int outerIndex) {
