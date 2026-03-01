@@ -63,6 +63,9 @@ public class GameBoardPanel extends JPanel {
     /** Callback when clicking a movable piece (piece index 0~3). */
     private IntConsumer onMovablePieceClick;
 
+    /** 已发送一次移动请求，在收到新状态前忽略再次点击，避免双击导致两子同时移动。 */
+    private volatile boolean moveRequestPending = false;
+
     /** Rotation center for each quarter: 0=bottom,1=left,2=top,3=right. */
     private int[] quarterCenterX = { -1, (int)BOARD_SIZE / 2 , (int)BOARD_SIZE / 2, (int)BOARD_SIZE / 2 };
     private int[] quarterCenterY = { -1, (int)BOARD_SIZE / 2 , (int)BOARD_SIZE / 2, (int)BOARD_SIZE / 2 };
@@ -96,6 +99,7 @@ public class GameBoardPanel extends JPanel {
             @Override
             public void mouseClicked(MouseEvent e) {
                 if (onMovablePieceClick == null || !rollerIsLocal || gameState == null) return;
+                if (moveRequestPending) return; // 已发过移动请求，等状态更新后再响应，避免双击触发两次
                 if (lastDiceResult <= 0 || lastDiceRollerColor == null || gameState.getCurrentTurn() != lastDiceRollerColor) return;
                 List<Integer> movable = ruleEngine.listMovablePieces(gameState, lastDiceRollerColor, lastDiceResult);
                 if (movable == null || movable.isEmpty()) return;
@@ -120,6 +124,7 @@ public class GameBoardPanel extends JPanel {
                         }
                         int x = xy[0] - size / 2, y = xy[1] - size / 2;
                         if (mx >= x && mx < x + size && my >= y && my < y + size && movable.contains(slot)) {
+                            moveRequestPending = true;
                             onMovablePieceClick.accept(slot);
                             return;
                         }
@@ -132,6 +137,7 @@ public class GameBoardPanel extends JPanel {
 
     public void setGameState(GameState state) {
         this.gameState = state;
+        moveRequestPending = false; // 收到新状态，允许下一次选子
         if (lastDiceRollerColor != null && state != null && state.getCurrentTurn() != lastDiceRollerColor) {
             lastDiceResult = -1;
             lastDiceRollerColor = null;

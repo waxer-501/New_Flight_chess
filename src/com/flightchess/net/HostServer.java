@@ -52,6 +52,9 @@ public class HostServer {
     private volatile Integer pendingDiceResult = null;
     private volatile String pendingRollerId = null;
 
+    /** 同一时间只处理一次移动请求，避免双击等导致两子同时移动。 */
+    private final Object moveRequestLock = new Object();
+
     private volatile boolean running = false;
 
     public HostServer(int port) {
@@ -323,32 +326,34 @@ public class HostServer {
         }
 
         private void handleMoveRequest(Message msg) {
-            if (gameState == null || pendingDiceResult == null || pendingRollerId == null) {
-                return;
+            synchronized (moveRequestLock) {
+                if (gameState == null || pendingDiceResult == null || pendingRollerId == null) {
+                    return;
+                }
+                if (!msg.getPlayerId().equals(pendingRollerId)) {
+                    return;
+                }
+                Object payload = msg.getPayload();
+                if (!(payload instanceof Integer)) {
+                    return;
+                }
+                int pieceIndex = (Integer) payload;
+                PlayerColor actorColor = playerColors.get(pendingRollerId);
+                if (actorColor == null) {
+                    return;
+                }
+                List<Integer> movable = ruleEngine.listMovablePieces(gameState, actorColor, pendingDiceResult);
+                if (movable == null || !movable.contains(pieceIndex)) {
+                    return;
+                }
+                MoveResult result = ruleEngine.movePiece(gameState, actorColor, pieceIndex, pendingDiceResult);
+                pendingDiceResult = null;
+                pendingRollerId = null;
+                if (!result.isExtraTurn()) {
+                    rotateTurn();
+                }
+                broadcast(new Message(MessageType.GAME_STATE_SNAPSHOT, roomId, msg.getPlayerId(), 0L, gameState));
             }
-            if (!msg.getPlayerId().equals(pendingRollerId)) {
-                return;
-            }
-            Object payload = msg.getPayload();
-            if (!(payload instanceof Integer)) {
-                return;
-            }
-            int pieceIndex = (Integer) payload;
-            PlayerColor actorColor = playerColors.get(pendingRollerId);
-            if (actorColor == null) {
-                return;
-            }
-            List<Integer> movable = ruleEngine.listMovablePieces(gameState, actorColor, pendingDiceResult);
-            if (movable == null || !movable.contains(pieceIndex)) {
-                return;
-            }
-            MoveResult result = ruleEngine.movePiece(gameState, actorColor, pieceIndex, pendingDiceResult);
-            pendingDiceResult = null;
-            pendingRollerId = null;
-            if (!result.isExtraTurn()) {
-                rotateTurn();
-            }
-            broadcast(new Message(MessageType.GAME_STATE_SNAPSHOT, roomId, msg.getPlayerId(), 0L, gameState));
         }
 
         void send(Message msg) {
