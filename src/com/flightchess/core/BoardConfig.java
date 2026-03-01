@@ -22,7 +22,7 @@ public final class BoardConfig {
     /** 每方外圈 1/4 段长度。 */
     public static final int QUARTER_LENGTH = OUTER_CELL_COUNT / 4; // 13
 
-    /** 每方“出发到外圈”的起始索引（与出生点所在角相邻的外圈格）。 */
+    /** 每方“出发到外圈”的起始索引（= 该方 1/4 外圈起始格 + 3，即起飞后第一步落点）。 */
     private static final Map<PlayerColor, Integer> START_INDEX = new EnumMap<>(PlayerColor.class);
     /** 每方“起飞格”逻辑索引（独立于外圈，使用负值避免冲突）。 */
     private static final Map<PlayerColor, Integer> TAKEOFF_INDEX = new EnumMap<>(PlayerColor.class);
@@ -33,23 +33,27 @@ public final class BoardConfig {
     /** 双倍区（死亡后激活）映射：玩家 -> 该玩家死亡时激活的外圈格集合。 */
     private static final Map<PlayerColor, Set<Integer>> DOUBLE_ZONE = new EnumMap<>(PlayerColor.class);
 
-    static {
-        // 起飞格：左下绿=12，右下红=51，右上蓝=38，左上黄=25（各角与外圈相接）
-        START_INDEX.put(PlayerColor.GREEN, 3);   // 左下
-        START_INDEX.put(PlayerColor.RED, 52);     // 右下
-        START_INDEX.put(PlayerColor.BLUE, 39);    // 右上
-        START_INDEX.put(PlayerColor.YELLOW, 16);  // 左上
-        // 逻辑起飞格索引（非外圈）：黄=-1，蓝=-2，红=-3，绿=-4
-        TAKEOFF_INDEX.put(PlayerColor.YELLOW, -1);
-        TAKEOFF_INDEX.put(PlayerColor.BLUE, -2);
-        TAKEOFF_INDEX.put(PlayerColor.RED, -3);
-        TAKEOFF_INDEX.put(PlayerColor.GREEN, -4);
+    /** 起飞后第一步落在本方 1/4 段的第几格（0=起始格，3=起始格+3）。 */
+    private static final int START_OFFSET_FROM_QUARTER = 3;
 
+    static {
         // 每方 13 格区间：绿 0~12(下)，红 39~51(右)，蓝 26~38(上)，黄 13~25(左)
         QUARTER_START.put(PlayerColor.GREEN, 0);
         QUARTER_START.put(PlayerColor.RED, 39);
         QUARTER_START.put(PlayerColor.BLUE, 26);
         QUARTER_START.put(PlayerColor.YELLOW, 13);
+
+        // 出发到外圈的第一格 = 本方 1/4 起始格 + START_OFFSET_FROM_QUARTER
+        for (PlayerColor color : PlayerColor.ordered()) {
+            int quarterStart = QUARTER_START.get(color);
+            START_INDEX.put(color, (quarterStart + START_OFFSET_FROM_QUARTER) % OUTER_CELL_COUNT);
+        }
+
+        // 逻辑起飞格索引（非外圈）：黄=-1，蓝=-2，红=-3，绿=-4
+        TAKEOFF_INDEX.put(PlayerColor.YELLOW, -1);
+        TAKEOFF_INDEX.put(PlayerColor.BLUE, -2);
+        TAKEOFF_INDEX.put(PlayerColor.RED, -3);
+        TAKEOFF_INDEX.put(PlayerColor.GREEN, -4);
 
         for (PlayerColor color : PlayerColor.ordered()) {
             int start = QUARTER_START.get(color);
