@@ -122,9 +122,17 @@ public class UiController {
                 openGameWindow();
             }
             if (gameWindow != null) {
+                com.flightchess.core.PlayerColor turnColor = state.getCurrentTurn();
+                String turnPlayerName = getPlayerNameByColor(turnColor);
+                boolean turnIsLocal = (turnColor != null && turnColor == getMyColor());
+                final String turnHint = (turnPlayerName != null && !turnPlayerName.isEmpty())
+                        ? (turnIsLocal ? "轮到您投掷" : "轮到 " + turnPlayerName + " 投掷")
+                        : "等待投掷";
                 SwingUtilities.invokeLater(() -> {
                     gameWindow.setGameState(state);
                     gameWindow.setRollerIsLocal(false);
+                    gameWindow.setInfoText(turnHint);
+                    gameWindow.setDiceEnabled(turnIsLocal);
                 });
             }
         } else if (type == MessageType.DICE_ROLL_RESULT) {
@@ -132,20 +140,31 @@ public class UiController {
             if (payload instanceof Integer && gameWindow != null) {
                 int dice = (Integer) payload;
                 com.flightchess.core.PlayerColor rollerColor = null;
+                String rollerName = null;
                 if (currentRoomInfo != null) {
                     for (com.flightchess.net.PlayerInfo p : currentRoomInfo.getPlayers()) {
                         if (msg.getPlayerId().equals(p.getPlayerId())) {
                             rollerColor = p.getColor();
+                            rollerName = (p.getNickname() != null && !p.getNickname().isEmpty())
+                                    ? p.getNickname() : (p.getColor() != null ? p.getColor().name() : "某玩家");
                             break;
                         }
                     }
                 }
+                if (rollerName == null) {
+                    rollerName = rollerColor != null ? rollerColor.name() : "某玩家";
+                }
                 final com.flightchess.core.PlayerColor color = rollerColor;
+                final String name = rollerName;
                 final boolean rollerIsLocal = (color != null && color == getMyColor());
                 SwingUtilities.invokeLater(() -> {
-                    gameWindow.setInfoText("掷骰结果: " + dice + (rollerIsLocal ? " — 请点击要移动的棋子" : ""));
+                    String who = name + " 掷出 ";
+                    gameWindow.setInfoText(who + dice + (rollerIsLocal ? " — 请点击要移动的棋子" : ""));
                     gameWindow.setLastDiceResult(dice, color);
                     gameWindow.setRollerIsLocal(rollerIsLocal);
+                    if (rollerIsLocal) {
+                        gameWindow.setDiceEnabled(false); // 已掷骰，等选子完成后再恢复
+                    }
                 });
             }
         }
@@ -184,6 +203,18 @@ public class UiController {
             }
         }
         return null;
+    }
+
+    /** 根据颜色取当前房间内该玩家的昵称，无则返回颜色名。 */
+    private String getPlayerNameByColor(PlayerColor color) {
+        if (currentRoomInfo == null || color == null) return color != null ? color.name() : "";
+        for (com.flightchess.net.PlayerInfo p : currentRoomInfo.getPlayers()) {
+            if (color == p.getColor()) {
+                String n = p.getNickname();
+                return (n != null && !n.isEmpty()) ? n : color.name();
+            }
+        }
+        return color.name();
     }
 }
 
