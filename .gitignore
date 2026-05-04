@@ -17,3 +17,6 @@ bin/
 # 系统
 .DS_Store
 Thumbs.db
+
+#claude相关
+CLAUDE.md
