@@ -93,8 +93,7 @@ public class UiController {
         });
     }
 
-    /** 打开对局窗口；若传入 afterOpen 则在窗口创建后于 EDT 中执行（用于首次收到状态时设置掷骰等）。 */
-    private void openGameWindow(Runnable afterOpen) {
+    private void openGameWindow() {
         SwingUtilities.invokeLater(() -> {
             if (gameWindow == null) {
                 gameWindow = new GameWindow(this);
@@ -103,14 +102,7 @@ public class UiController {
                 }
             }
             gameWindow.setVisible(true);
-            if (afterOpen != null) {
-                afterOpen.run();
-            }
         });
-    }
-
-    private void openGameWindow() {
-        openGameWindow(null);
     }
 
     private void onMessageReceived(Message msg) {
@@ -125,26 +117,23 @@ public class UiController {
         } else if (type == MessageType.GAME_STATE_SNAPSHOT) {
             GameState state = (GameState) msg.getPayload();
             this.currentGameState = state;
-            com.flightchess.core.PlayerColor turnColor = state.getCurrentTurn();
-            String turnPlayerName = getPlayerNameByColor(turnColor);
-            boolean turnIsLocal = (turnColor != null && turnColor == getMyColor());
-            final String turnHint = (turnPlayerName != null && !turnPlayerName.isEmpty())
-                    ? (turnIsLocal ? "轮到您投掷" : "轮到 " + turnPlayerName + " 投掷")
-                    : "等待投掷";
-            final GameState stateForUi = state;
-            final boolean diceEnabled = turnIsLocal;
-            Runnable applyState = () -> {
-                if (gameWindow != null) {
-                    gameWindow.setGameState(stateForUi);
+            // 收到第一帧状态时，如果还没有对局窗口，则先创建窗口。
+            if (gameWindow == null) {
+                openGameWindow();
+            }
+            if (gameWindow != null) {
+                com.flightchess.core.PlayerColor turnColor = state.getCurrentTurn();
+                String turnPlayerName = getPlayerNameByColor(turnColor);
+                boolean turnIsLocal = (turnColor != null && turnColor == getMyColor());
+                final String turnHint = (turnPlayerName != null && !turnPlayerName.isEmpty())
+                        ? (turnIsLocal ? "轮到您投掷" : "轮到 " + turnPlayerName + " 投掷")
+                        : "等待投掷";
+                SwingUtilities.invokeLater(() -> {
+                    gameWindow.setGameState(state);
                     gameWindow.setRollerIsLocal(false);
                     gameWindow.setInfoText(turnHint);
-                    gameWindow.setDiceEnabled(diceEnabled);
-                }
-            };
-            if (gameWindow == null) {
-                openGameWindow(applyState);
-            } else {
-                SwingUtilities.invokeLater(applyState);
+                    gameWindow.setDiceEnabled(turnIsLocal);
+                });
             }
         } else if (type == MessageType.DICE_ROLL_RESULT) {
             Object payload = msg.getPayload();
@@ -152,15 +141,9 @@ public class UiController {
                 int dice = (Integer) payload;
                 com.flightchess.core.PlayerColor rollerColor = null;
                 String rollerName = null;
-                String pid = msg.getPlayerId();
-                if (pid != null && pid.startsWith("AI-")) {
-                    rollerName = "AI托管";
-                    try {
-                        rollerColor = com.flightchess.core.PlayerColor.valueOf(pid.substring(3));
-                    } catch (Exception ignored) { }
-                } else if (currentRoomInfo != null) {
+                if (currentRoomInfo != null) {
                     for (com.flightchess.net.PlayerInfo p : currentRoomInfo.getPlayers()) {
-                        if (pid != null && pid.equals(p.getPlayerId())) {
+                        if (msg.getPlayerId().equals(p.getPlayerId())) {
                             rollerColor = p.getColor();
                             rollerName = (p.getNickname() != null && !p.getNickname().isEmpty())
                                     ? p.getNickname() : (p.getColor() != null ? p.getColor().name() : "某玩家");

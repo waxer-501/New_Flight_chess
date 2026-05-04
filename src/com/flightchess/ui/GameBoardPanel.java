@@ -35,11 +35,17 @@ import com.flightchess.core.RuleEngine;
 public class GameBoardPanel extends JPanel {
 
     private static final double BOARD_SIZE = 1080.0;
-    /** 13 cells per side, matching 52 outer cells. */
+
+
+    private static final double BOARD_SCALE = 0.80;
+
+/** 13 cells per side, matching 52 outer cells. */
     private static final int OUTER_SIDE = 13;
-    /** Long edge of a 2:1 rectangular cell. */
-    private static final double CELL_LONG = BOARD_SIZE/8.5;
-    /** Short edge of a 2:1 rectangular cell. */
+
+/** Long edge of a 2:1 rectangular cell. */
+    private static final double CELL_LONG = BOARD_SIZE / 8.5 * BOARD_SCALE;
+
+/** Short edge of a 2:1 rectangular cell. */
     private static final double CELL_SHORT = CELL_LONG / 2;
 
     private GameState gameState;
