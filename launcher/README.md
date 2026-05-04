@@ -1,5 +1,5 @@
 # 一键启动器
-
+#需要在 https://www.radmin-vpn.com 下载安装redmin vpn来联网
 克隆仓库后可直接使用，**无需本地安装 C++ 或重新编译**：
 
 - **方式一**：双击项目根目录下的 `Launcher.exe`
