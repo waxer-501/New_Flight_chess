@@ -48,6 +48,7 @@ public class GameWindow extends JFrame {
         rollDiceBtn.addActionListener((ActionEvent e) -> controller.requestDiceRoll());
 
         pack();
+        setResizable(false);
         setLocationRelativeTo(null);
     }
 
