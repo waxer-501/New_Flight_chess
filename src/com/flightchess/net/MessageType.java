@@ -30,6 +30,9 @@ public enum MessageType {
     PONG,
     RECONNECT_REQ,
     RECONNECT_RESP,
-    HOST_MIGRATION_NOTICE
+    HOST_MIGRATION_NOTICE,
+
+    // 调试
+    DEBUG_DICE
 }
 

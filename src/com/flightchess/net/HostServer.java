@@ -190,6 +190,9 @@ public class HostServer {
                 case COLOR_SELECT:
                     handleColorSelect(msg);
                     break;
+                case DEBUG_DICE:
+                    handleDebugDice(msg);
+                    break;
                 default:
                     break;
             }
@@ -365,6 +368,55 @@ public class HostServer {
             broadcast(new Message(MessageType.DICE_ROLL_RESULT, roomId, msg.getPlayerId(), 0L, dice));
 
             // 若无任何可走棋子（如未出飞机且未掷出 6），直接跳过本回合，轮到下一位
+            List<Integer> movable = ruleEngine.listMovablePieces(gameState, actorColor, dice);
+            if (movable.isEmpty()) {
+                synchronized (moveRequestLock) {
+                    pendingDiceResult = null;
+                    pendingRollerId = null;
+                    rotateTurn();
+                    broadcast(new Message(MessageType.GAME_STATE_SNAPSHOT, roomId, msg.getPlayerId(), 0L, gameState));
+                    runAITurnIfNeeded();
+                }
+            }
+        }
+
+        private void handleDebugDice(Message msg) {
+            if (gameState == null) {
+                return;
+            }
+            PlayerColor actorColor = playerColors.get(msg.getPlayerId());
+            if (actorColor == null) {
+                return;
+            }
+            if (gameState.getCurrentTurn() != actorColor) {
+                return;
+            }
+            Object payload = msg.getPayload();
+            if (!(payload instanceof Integer)) {
+                return;
+            }
+            int dice = (Integer) payload;
+            if (dice < 1 || dice > 6) {
+                return;
+            }
+
+            // 连续两次 6 复活逻辑
+            int count = gameState.getConsecutiveSixCount(actorColor);
+            if (dice == 6) {
+                count++;
+                if (count >= 2) {
+                    reviveOnePiece(actorColor);
+                    count = 0;
+                }
+            } else {
+                count = 0;
+            }
+            gameState.setConsecutiveSixCount(actorColor, count);
+
+            pendingDiceResult = dice;
+            pendingRollerId = msg.getPlayerId();
+            broadcast(new Message(MessageType.DICE_ROLL_RESULT, roomId, msg.getPlayerId(), 0L, dice));
+
             List<Integer> movable = ruleEngine.listMovablePieces(gameState, actorColor, dice);
             if (movable.isEmpty()) {
                 synchronized (moveRequestLock) {

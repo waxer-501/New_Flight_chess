@@ -176,6 +176,10 @@ public class UiController {
         send(new Message(MessageType.COLOR_SELECT, roomId, playerId, 0L, color));
     }
 
+    public void debugDice(int dice) {
+        send(new Message(MessageType.DEBUG_DICE, roomId, playerId, 0L, dice));
+    }
+
     public void toggleReady() {
         send(new Message(MessageType.PLAYER_READY, roomId, playerId, 0L, null));
     }

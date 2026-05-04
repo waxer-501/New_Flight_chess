@@ -22,3 +22,20 @@
 ---
 
 若仓库中未包含 `Launcher.exe`，可在此目录运行 `build_launcher.bat` 自行编译（需安装 g++，如 MinGW-w64）。
+
+---
+
+## 调试模式
+
+对局中按 **G 键** 可直接输入骰子值（1~6），跳过随机掷骰，方便测试特定步数场景。
+
+**开启方式：**
+
+1. 打开 `src/com/flightchess/ui/GameWindow.java`
+2. 找到第 23 行，将 `DEBUG_MODE` 设为 `true`：
+   ```java
+   private static final boolean DEBUG_MODE = false;  // 改为 true
+   ```
+3. 重新编译运行
+
+**关闭方式：** 将 `DEBUG_MODE` 改回 `false` 后重新编译。发布时默认为关闭状态。

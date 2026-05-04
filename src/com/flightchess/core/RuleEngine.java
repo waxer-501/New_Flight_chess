@@ -96,16 +96,26 @@ public class RuleEngine {
         } else if (piece.isInTakeoffArea()) {
             // 从起飞格出发：第 1 步到 startIndex，再走 dice-1 步
             int to = BoardConfig.moveForwardOnOuter(startIndex, dice - 1);
-            // 若落点格子颜色与棋子颜色相同，则再前进四格
-            if (color == BoardConfig.getCellColorAtOuterIndex(to)) {
-                to = BoardConfig.moveForwardOnOuter(to, 4);
-            }
+            // 先吃子（若落点有敌人），再判断同色跳格
             Set<Piece> capturedPieces = getPiecesAtOuterIndex(state, to, color, false);
             if (!capturedPieces.isEmpty()) {
                 captured = true;
                 for (Piece enemy : capturedPieces) {
                     enemy.setCellType(CellType.WAITING_AREA);
                     enemy.setPositionIndex(-1);
+                }
+            }
+            // 若落点格子颜色与棋子颜色相同，则再前进四格
+            if (color == BoardConfig.getCellColorAtOuterIndex(to)) {
+                to = BoardConfig.moveForwardOnOuter(to, 4);
+                // 跳后也检查是否有敌人
+                Set<Piece> jumpCaptured = getPiecesAtOuterIndex(state, to, color, false);
+                if (!jumpCaptured.isEmpty()) {
+                    captured = true;
+                    for (Piece enemy : jumpCaptured) {
+                        enemy.setCellType(CellType.WAITING_AREA);
+                        enemy.setPositionIndex(-1);
+                    }
                 }
             }
             piece.setCellType(CellType.OUTER);
@@ -116,17 +126,26 @@ public class RuleEngine {
         } else if (piece.getCellType() == CellType.OUTER) {
             int from = piece.getPositionIndex();
             int to = BoardConfig.moveForwardOnOuter(from, dice);
-            // 若落点格子颜色与棋子颜色相同，则再前进四格
-            if (color == BoardConfig.getCellColorAtOuterIndex(to)) {
-                to = BoardConfig.moveForwardOnOuter(to, 4);
-            }
-
+            // 先吃子（若落点有敌人），再判断同色跳格
             Set<Piece> capturedPieces = getPiecesAtOuterIndex(state, to, color, false);
             if (!capturedPieces.isEmpty()) {
                 captured = true;
                 for (Piece enemy : capturedPieces) {
                     enemy.setCellType(CellType.WAITING_AREA);
                     enemy.setPositionIndex(-1);
+                }
+            }
+            // 若落点格子颜色与棋子颜色相同，则再前进四格
+            if (color == BoardConfig.getCellColorAtOuterIndex(to)) {
+                to = BoardConfig.moveForwardOnOuter(to, 4);
+                // 跳后也检查是否有敌人
+                Set<Piece> jumpCaptured = getPiecesAtOuterIndex(state, to, color, false);
+                if (!jumpCaptured.isEmpty()) {
+                    captured = true;
+                    for (Piece enemy : jumpCaptured) {
+                        enemy.setCellType(CellType.WAITING_AREA);
+                        enemy.setPositionIndex(-1);
+                    }
                 }
             }
 

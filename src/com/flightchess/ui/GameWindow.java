@@ -3,11 +3,16 @@ package com.flightchess.ui;
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
 import java.awt.event.ActionEvent;
+import java.awt.event.KeyEvent;
 
+import javax.swing.AbstractAction;
 import javax.swing.JButton;
+import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.KeyStroke;
 
 import com.flightchess.core.GameState;
 import com.flightchess.core.PlayerColor;
@@ -16,6 +21,9 @@ import com.flightchess.core.PlayerColor;
  * 对局窗口：包含棋盘与掷骰/日志区域。
  */
 public class GameWindow extends JFrame {
+
+    /** 调试模式：改为 true 后可在对局中按 G 键直接指定骰子值。发布时置为 false。 */
+    private static final boolean DEBUG_MODE = false;
 
     private final UiController controller;
     private final GameBoardPanel boardPanel = new GameBoardPanel();
@@ -46,6 +54,28 @@ public class GameWindow extends JFrame {
         add(bottom, BorderLayout.SOUTH);
 
         rollDiceBtn.addActionListener((ActionEvent e) -> controller.requestDiceRoll());
+
+        // 调试功能：按 G 键弹出骰子输入框（仅 DEBUG_MODE=true 时启用）
+        if (DEBUG_MODE) {
+            getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
+                    .put(KeyStroke.getKeyStroke(KeyEvent.VK_G, 0, false), "debugDice");
+            getRootPane().getActionMap().put("debugDice", new AbstractAction() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    String input = JOptionPane.showInputDialog(
+                            GameWindow.this, "输入骰子值 (1-6):", "调试骰子", JOptionPane.PLAIN_MESSAGE);
+                    if (input != null && !input.trim().isEmpty()) {
+                        try {
+                            int dice = Integer.parseInt(input.trim());
+                            if (dice >= 1 && dice <= 6) {
+                                controller.debugDice(dice);
+                            }
+                        } catch (NumberFormatException ignored) {
+                        }
+                    }
+                }
+            });
+        }
 
         pack();
         setResizable(false);
