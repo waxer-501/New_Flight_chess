@@ -350,14 +350,9 @@ public class HostServer {
 
             int dice = ruleEngine.rollDice();
 
-            // 连续两次 6 复活逻辑
             int count = gameState.getConsecutiveSixCount(actorColor);
             if (dice == 6) {
                 count++;
-                if (count >= 2) {
-                    reviveOnePiece(actorColor);
-                    count = 0;
-                }
             } else {
                 count = 0;
             }
@@ -400,14 +395,9 @@ public class HostServer {
                 return;
             }
 
-            // 连续两次 6 复活逻辑
             int count = gameState.getConsecutiveSixCount(actorColor);
             if (dice == 6) {
                 count++;
-                if (count >= 2) {
-                    reviveOnePiece(actorColor);
-                    count = 0;
-                }
             } else {
                 count = 0;
             }
@@ -506,10 +496,6 @@ public class HostServer {
         int count = gameState.getConsecutiveSixCount(color);
         if (dice == 6) {
             count++;
-            if (count >= 2) {
-                reviveOnePiece(color);
-                count = 0;
-            }
         } else {
             count = 0;
         }
@@ -558,27 +544,6 @@ public class HostServer {
             }
             if (inRoom) {
                 gameState.setCurrentTurn(next);
-                break;
-            }
-        }
-    }
-
-    /**
-     * 在等待复活区为指定玩家复活一架棋子，放回其起飞格。
-     */
-    private void reviveOnePiece(PlayerColor color) {
-        if (gameState == null) {
-            return;
-        }
-        Player player = gameState.getPlayer(color);
-        if (player == null) {
-            return;
-        }
-        for (com.flightchess.core.Piece piece : player.getPieces()) {
-            if (piece.isInWaitingArea()) {
-                int startIndex = com.flightchess.core.BoardConfig.getStartIndex(color);
-                piece.setCellType(com.flightchess.core.CellType.OUTER);
-                piece.setPositionIndex(startIndex);
                 break;
             }
         }
