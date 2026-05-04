@@ -37,7 +37,7 @@ public class GameBoardPanel extends JPanel {
     private static final double BOARD_SIZE = 1080.0;
 
 
-    private static final double BOARD_SCALE = 1.00;
+    private static final double BOARD_SCALE = 0.83;
 
 /** 13 cells per side, matching 52 outer cells. */
     private static final int OUTER_SIDE = 13;
@@ -225,7 +225,7 @@ public class GameBoardPanel extends JPanel {
         int[] ys = { 0, 0, h - side, h - side };
         int[] takeoffXs = { 0, (int) Math.round(w - side / 3.5 * 4.5), (int) Math.round(w - side / 3.5), side }; // Keep consistent with drawTakeoffArea radius math.
         int[] takeoffYs = { 0, 0 - side, h - 2 * side - (int) Math.round(side / 3.5), h - (int) Math.round(side / 3.5 * 4.5) };
-        PlayerColor[] colors = { PlayerColor.YELLOW, PlayerColor.BLUE, PlayerColor.RED, PlayerColor.GREEN };
+        PlayerColor[] colors = { PlayerColor.RED, PlayerColor.BLUE, PlayerColor.YELLOW, PlayerColor.GREEN };
         for (int i = 0; i < 4; i++) {
             drawBirthPointCell(g2, xs[i], ys[i], colors[i]);
             drawBirthPointIndex(g2, xs[i], ys[i], side, i);
@@ -278,9 +278,9 @@ public class GameBoardPanel extends JPanel {
 
     private static int colorToBirthIndex(PlayerColor c) {
         switch (c) {
-            case YELLOW: return 0;
+            case RED: return 0;
             case BLUE:   return 1;
-            case RED:    return 2;
+            case YELLOW:    return 2;
             case GREEN:  return 3;
             default:     return 0;
         }
@@ -306,9 +306,9 @@ public class GameBoardPanel extends JPanel {
         int r = (int) Math.round(side / 3.5);
         int idx;
         switch (takeoffIndex) {
-            case -1: idx = 0; break; // Yellow
+            case -1: idx = 0; break; // Red
             case -2: idx = 1; break; // Blue
-            case -3: idx = 2; break; // Red
+            case -3: idx = 2; break; // Yellow
             case -4: idx = 3; break; // Green
             default: return new int[] { w / 2, h / 2 };
         }

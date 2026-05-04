@@ -9,7 +9,7 @@ import java.util.Set;
  * 棋盘坐标与特殊格子定义。
  *
  * 外圈 52 格顺时针：0~12 下，13~25 左，26~38 上，39~51 右（与 GameBoardPanel 绘制一致）。
- * 出生点：左上黄、右上蓝、右下红、左下绿；起飞格为各角与外圈相接的那一格。
+ * 出生点：左上红、右上蓝、右下黄、左下绿；起飞格为各角与外圈相接的那一格。
  */
 public final class BoardConfig {
 
@@ -37,11 +37,11 @@ public final class BoardConfig {
     private static final int START_OFFSET_FROM_QUARTER = 3;
 
     static {
-        // 每方 13 格区间：绿 0~12(下)，红 39~51(右)，蓝 26~38(上)，黄 13~25(左)
+        // 每方 13 格区间：绿 0~12(下)，红 13~25(左上)，蓝 26~38(上)，黄 39~51(右下)
         QUARTER_START.put(PlayerColor.GREEN, 0);
-        QUARTER_START.put(PlayerColor.RED, 39);
+        QUARTER_START.put(PlayerColor.RED, 13);
         QUARTER_START.put(PlayerColor.BLUE, 26);
-        QUARTER_START.put(PlayerColor.YELLOW, 13);
+        QUARTER_START.put(PlayerColor.YELLOW, 39);
 
         // 出发到外圈的第一格 = 本方 1/4 起始格 + START_OFFSET_FROM_QUARTER
         for (PlayerColor color : PlayerColor.ordered()) {
@@ -49,10 +49,10 @@ public final class BoardConfig {
             START_INDEX.put(color, (quarterStart + START_OFFSET_FROM_QUARTER) % OUTER_CELL_COUNT);
         }
 
-        // 逻辑起飞格索引（非外圈）：黄=-1，蓝=-2，红=-3，绿=-4
-        TAKEOFF_INDEX.put(PlayerColor.YELLOW, -1);
+        // 逻辑起飞格索引（非外圈）：红=-1，蓝=-2，黄=-3，绿=-4
+        TAKEOFF_INDEX.put(PlayerColor.RED, -1);
         TAKEOFF_INDEX.put(PlayerColor.BLUE, -2);
-        TAKEOFF_INDEX.put(PlayerColor.RED, -3);
+        TAKEOFF_INDEX.put(PlayerColor.YELLOW, -3);
         TAKEOFF_INDEX.put(PlayerColor.GREEN, -4);
 
         for (PlayerColor color : PlayerColor.ordered()) {
