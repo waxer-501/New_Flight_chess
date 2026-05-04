@@ -72,9 +72,9 @@ public class GameBoardPanel extends JPanel {
     /** 已发送一次移动请求，在收到新状态前忽略再次点击，避免双击导致两子同时移动。 */
     private volatile boolean moveRequestPending = false;
 
-    /** Rotation center for each quarter: 0=bottom,1=left,2=top,3=right. */
-    private int[] quarterCenterX = { -1, (int)BOARD_SIZE / 2 , (int)BOARD_SIZE / 2, (int)BOARD_SIZE / 2 };
-    private int[] quarterCenterY = { -1, (int)BOARD_SIZE / 2 , (int)BOARD_SIZE / 2, (int)BOARD_SIZE / 2 };
+    /** Rotation center for each quarter: computed in paintComponent. */
+    private int[] quarterCenterX = { -1, -1, -1, -1 };
+    private int[] quarterCenterY = { -1, -1, -1, -1 };
 
     /** Set rotation center for quarter (0~3). */
     public void setQuarterCenter(int quarter, int centerX, int centerY) {
@@ -200,6 +200,13 @@ public class GameBoardPanel extends JPanel {
         int h = getHeight();
         double cx = w / 2.0;
         double cy = h / 2.0;
+
+        // 同步所有象限的旋转中心到面板实际中心，避免偏移
+        for (int i = 0; i < 4; i++) {
+            quarterCenterX[i] = (int) Math.round(cx);
+            quarterCenterY[i] = (int) Math.round(cy);
+        }
+
         double halfOuter = OUTER_SIDE * CELL_LONG / 2.0;
         double left = cx - halfOuter;
         double top = cy - halfOuter;
