@@ -291,6 +291,9 @@ public class HostServer {
             gameState = new GameState(nicknames);
 
             broadcast(new Message(MessageType.GAME_STATE_SNAPSHOT, roomId, msg.getPlayerId(), 0L, gameState));
+            synchronized (moveRequestLock) {
+                runAITurnIfNeeded();
+            }
         }
 
         private void handleDiceRoll(Message msg) {
@@ -323,6 +326,18 @@ public class HostServer {
             pendingDiceResult = dice;
             pendingRollerId = msg.getPlayerId();
             broadcast(new Message(MessageType.DICE_ROLL_RESULT, roomId, msg.getPlayerId(), 0L, dice));
+
+            // 若无任何可走棋子（如未出飞机且未掷出 6），直接跳过本回合，轮到下一位
+            List<Integer> movable = ruleEngine.listMovablePieces(gameState, actorColor, dice);
+            if (movable.isEmpty()) {
+                synchronized (moveRequestLock) {
+                    pendingDiceResult = null;
+                    pendingRollerId = null;
+                    rotateTurn();
+                    broadcast(new Message(MessageType.GAME_STATE_SNAPSHOT, roomId, msg.getPlayerId(), 0L, gameState));
+                    runAITurnIfNeeded();
+                }
+            }
         }
 
         private void handleMoveRequest(Message msg) {
@@ -353,6 +368,7 @@ public class HostServer {
                     rotateTurn();
                 }
                 broadcast(new Message(MessageType.GAME_STATE_SNAPSHOT, roomId, msg.getPlayerId(), 0L, gameState));
+                runAITurnIfNeeded();
             }
         }
 
@@ -366,6 +382,67 @@ public class HostServer {
                 e.printStackTrace();
             }
         }
+    }
+
+    /** 当前回合颜色是否由已连接的真人玩家操作（否则由 AI 接管）。 */
+    private boolean isColorHandledByHuman(PlayerColor color) {
+        if (color == null) return false;
+        for (Map.Entry<String, PlayerColor> e : playerColors.entrySet()) {
+            if (e.getValue() == color && clients.containsKey(e.getKey())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 若当前回合无人操作（断线或空位），则由 AI 掷骰并选子移动；可连续多轮直到轮到真人。
+     * 必须在已持有 moveRequestLock 时调用。
+     */
+    private void runAITurnIfNeeded() {
+        if (gameState == null || roomInfo == null) return;
+        while (!isColorHandledByHuman(gameState.getCurrentTurn())) {
+            runOneAITurn();
+            if (gameState == null) break;
+        }
+    }
+
+    /** 执行一次 AI 回合：掷骰、选子、移动并广播。调用方需已持有 moveRequestLock。 */
+    private void runOneAITurn() {
+        if (gameState == null) return;
+        PlayerColor color = gameState.getCurrentTurn();
+        String aiPlayerId = "AI-" + color.name();
+
+        int dice = ruleEngine.rollDice();
+        int count = gameState.getConsecutiveSixCount(color);
+        if (dice == 6) {
+            count++;
+            if (count >= 2) {
+                reviveOnePiece(color);
+                count = 0;
+            }
+        } else {
+            count = 0;
+        }
+        gameState.setConsecutiveSixCount(color, count);
+
+        broadcast(new Message(MessageType.DICE_ROLL_RESULT, roomId, aiPlayerId, 0L, dice));
+
+        int pieceIndex = aiController.choosePiece(gameState, color, dice);
+        if (pieceIndex < 0) {
+            pendingDiceResult = null;
+            pendingRollerId = null;
+            rotateTurn();
+            broadcast(new Message(MessageType.GAME_STATE_SNAPSHOT, roomId, aiPlayerId, 0L, gameState));
+            return;
+        }
+        MoveResult result = ruleEngine.movePiece(gameState, color, pieceIndex, dice);
+        pendingDiceResult = null;
+        pendingRollerId = null;
+        if (!result.isExtraTurn()) {
+            rotateTurn();
+        }
+        broadcast(new Message(MessageType.GAME_STATE_SNAPSHOT, roomId, aiPlayerId, 0L, gameState));
     }
 
     private void rotateTurn() {
