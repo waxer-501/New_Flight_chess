@@ -86,7 +86,7 @@ public class UiController {
                 roomWindow.setHost(isHost);
                 // 如果在打开窗口之前已经收到了房间信息，立刻刷新一次界面
                 if (currentRoomInfo != null) {
-                    roomWindow.updateRoomInfo(currentRoomInfo);
+                    roomWindow.updateRoomInfo(currentRoomInfo, playerId);
                 }
             }
             roomWindow.setVisible(true);
@@ -112,7 +112,7 @@ public class UiController {
             this.roomId = info.getRoomId();
             this.currentRoomInfo = info;
             if (roomWindow != null) {
-                SwingUtilities.invokeLater(() -> roomWindow.updateRoomInfo(info));
+                SwingUtilities.invokeLater(() -> roomWindow.updateRoomInfo(info, playerId));
             }
         } else if (type == MessageType.GAME_STATE_SNAPSHOT) {
             GameState state = (GameState) msg.getPayload();
@@ -171,6 +171,10 @@ public class UiController {
     }
 
     // ===== 房间操作 =====
+
+    public void selectColor(PlayerColor color) {
+        send(new Message(MessageType.COLOR_SELECT, roomId, playerId, 0L, color));
+    }
 
     public void toggleReady() {
         send(new Message(MessageType.PLAYER_READY, roomId, playerId, 0L, null));

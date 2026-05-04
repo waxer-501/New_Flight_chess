@@ -52,5 +52,9 @@ public class PlayerInfo implements Serializable {
     public void setReady(boolean ready) {
         this.ready = ready;
     }
+
+    public void setColor(PlayerColor color) {
+        this.color = color;
+    }
 }
 

@@ -13,6 +13,7 @@ public enum MessageType {
     JOIN_ROOM_RESP,
     ROOM_STATE_PUSH,
     PLAYER_READY,
+    COLOR_SELECT,
     CHAT_MESSAGE,
 
     // 对局

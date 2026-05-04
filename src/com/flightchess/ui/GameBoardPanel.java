@@ -37,7 +37,7 @@ public class GameBoardPanel extends JPanel {
     private static final double BOARD_SIZE = 1080.0;
 
 
-    private static final double BOARD_SCALE = 0.80;
+    private static final double BOARD_SCALE = 1.00;
 
 /** 13 cells per side, matching 52 outer cells. */
     private static final int OUTER_SIDE = 13;
@@ -558,6 +558,8 @@ public class GameBoardPanel extends JPanel {
         g2.setColor(Color.BLACK);
         g2.drawOval(cx, cy, d, d);
     }
+
+    //public void TestDrawOuterCells
 
     /** Right-triangle cell template, leg is side length, (left,top) is bbox top-left. */
     private enum TriangleCorner { TOP_LEFT, TOP_RIGHT, BOTTOM_RIGHT, BOTTOM_LEFT }

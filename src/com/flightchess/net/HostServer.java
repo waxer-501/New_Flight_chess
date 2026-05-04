@@ -187,6 +187,9 @@ public class HostServer {
                     break;
                 case PING:
                     break;
+                case COLOR_SELECT:
+                    handleColorSelect(msg);
+                    break;
                 default:
                     break;
             }
@@ -260,6 +263,40 @@ public class HostServer {
                     break;
                 }
             }
+            broadcast(new Message(MessageType.ROOM_STATE_PUSH, roomId, msg.getPlayerId(), 0L, roomInfo));
+        }
+
+        private void handleColorSelect(Message msg) {
+            if (roomInfo == null) {
+                return;
+            }
+            Object payload = msg.getPayload();
+            if (!(payload instanceof PlayerColor)) {
+                return;
+            }
+            PlayerColor newColor = (PlayerColor) payload;
+            PlayerColor oldColor = playerColors.get(msg.getPlayerId());
+            if (oldColor == null || oldColor == newColor) {
+                return;
+            }
+            // 目标颜色已被其他人占用则忽略
+            if (usedColors.contains(newColor)) {
+                return;
+            }
+
+            // 切换颜色
+            usedColors.remove(oldColor);
+            usedColors.add(newColor);
+            playerColors.put(msg.getPlayerId(), newColor);
+
+            // 更新 PlayerInfo
+            for (PlayerInfo p : roomInfo.getPlayers()) {
+                if (p.getPlayerId().equals(msg.getPlayerId())) {
+                    p.setColor(newColor);
+                    break;
+                }
+            }
+
             broadcast(new Message(MessageType.ROOM_STATE_PUSH, roomId, msg.getPlayerId(), 0L, roomInfo));
         }
 
