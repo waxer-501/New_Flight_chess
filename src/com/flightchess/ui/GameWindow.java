@@ -23,7 +23,7 @@ import com.flightchess.core.PlayerColor;
 public class GameWindow extends JFrame {
 
     /** 调试模式：改为 true 后可在对局中按 G 键直接指定骰子值。发布时置为 false。 */
-    private static final boolean DEBUG_MODE = true;
+    private static final boolean DEBUG_MODE = false;
 
     private final UiController controller;
     private final GameBoardPanel boardPanel = new GameBoardPanel();
