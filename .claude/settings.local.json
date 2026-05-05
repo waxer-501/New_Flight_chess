@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(javac -d out src/module-info.java src/com/flightchess/app/*.java src/com/flightchess/core/*.java src/com/flightchess/net/*.java src/com/flightchess/ui/*.java)",
-      "Bash(java -p out -m New_Flight_chess/com.flightchess.app.Launcher)"
+      "Bash(java -p out -m New_Flight_chess/com.flightchess.app.Launcher)",
+      "Bash(code *)",
+      "Bash(taskkill /f /im java.exe)"
     ]
   }
 }

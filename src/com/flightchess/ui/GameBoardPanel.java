@@ -386,6 +386,14 @@ public class GameBoardPanel extends JPanel {
         drawTrackRect(g2, x2Left, y0 - S * 2.0, L, S, order[5 % 4]);
         drawRightTriangleCell(g2, x2Left, y0 - S * 4.0, L, TriangleCorner.TOP_LEFT, order[6 % 4]);
         drawRightTriangleCell(g2, x2Left, y0 - S * 4.0, L, TriangleCorner.BOTTOM_LEFT, order[7 % 4]);
+
+        double centerOffset = (L - S) / 2.0;
+
+        // 黄色浅色长方形：放在上方，并相对三角形区域水平居中
+        drawLightRect(g2, x2Left + centerOffset, y0 - S * 4.0 - L, S, L, PlayerColor.YELLOW);
+
+        // 蓝色浅色长方形：放在右边，并相对三角形区域垂直居中
+        drawLightRect(g2, x2Left + L, y0 - S * 4.0 + centerOffset, L, S, PlayerColor.BLUE);
         drawTrackRect(g2, x2Left - S, y0 - 2.0 * L, S, L, order[8 % 4]);
         drawTrackRect(g2, x2Left - 2.0 * S, y0 - 2.0 * L, S, L, order[9 % 4]);
         double x10Left = x2Left - 2.0 * L;
@@ -393,10 +401,96 @@ public class GameBoardPanel extends JPanel {
         drawTrackRect(g2, x10Left, y0 - 2.0 * L - S, L, S, order[11 % 4]);
         drawTrackRect(g2, x10Left, y0 - 2.0 * L - S * 2.0, L, S, order[12 % 4]);
 
+        // 画底部绿色终点通道：5 个 S×S 正方形 + 一个等腰三角形
+        drawFinishLane(g2, x0, y0, S, 0, PlayerColor.GREEN);
+
+        // 旋转生成另外三个方向的外圈轨道
         for (int q = 1; q <= 3; q++) {
             drawQuarterRotated(g2, cx, h, q, L, S, order);
         }
+
+// 旋转生成另外三个方向的终点通道
+        drawFinishLane(g2, x0, y0, S, 1, PlayerColor.RED);
+        drawFinishLane(g2, x0, y0, S, 2, PlayerColor.BLUE);
+        drawFinishLane(g2, x0, y0, S, 3, PlayerColor.YELLOW);
     }
+
+    /**
+     * Draw finish lane: 5 square cells above the rightmost vertical rectangle,
+     * plus an isosceles triangle on top.
+     *
+     * @param baseX   x of the rightmost vertical outer-track rectangle
+     * @param baseY   y of the rightmost vertical outer-track rectangle
+     * @param S       short side length, also used as square side length
+     * @param quarter 0=bottom, 1=left, 2=top, 3=right
+     * @param color   lane color
+     */
+    private void drawFinishLane(Graphics2D g2, double baseX, double baseY, double S, int quarter, PlayerColor color) {
+        double rotCx = quarterCenterX[quarter] >= 0 ? quarterCenterX[quarter] : getWidth() / 2.0;
+        double rotCy = quarterCenterY[quarter] >= 0 ? quarterCenterY[quarter] : getHeight() / 2.0;
+
+        // 5 个正方形，紧贴在右侧竖向长方形格子的上方
+        for (int i = 1; i <= 5; i++) {
+            double x = baseX;
+            double y = baseY - i * S;
+            drawRotatedRect(g2, x, y, S, S, rotCx, rotCy, quarter, color);
+        }
+
+        // 等腰三角形：
+        // 底边 = 3S，高 = 1.5S
+        // 底边贴在第 5 个正方形的上边
+        double baseCenterX = baseX + S / 2.0;
+        double baseLineY = baseY - 5.0 * S;
+        double triangleBase = 3.0 * S;
+        double triangleHeight = 1.5 * S;
+
+        double x1 = baseCenterX - triangleBase / 2.0;
+        double y1 = baseLineY;
+
+        double x2 = baseCenterX + triangleBase / 2.0;
+        double y2 = baseLineY;
+
+        double x3 = baseCenterX;
+        double y3 = baseLineY - triangleHeight;
+
+        drawRotatedIsoscelesTriangle(g2, x1, y1, x2, y2, x3, y3, rotCx, rotCy, quarter, color);
+    }
+
+    /** Draw rotated isosceles triangle. */
+    private void drawRotatedIsoscelesTriangle(
+            Graphics2D g2,
+            double x1, double y1,
+            double x2, double y2,
+            double x3, double y3,
+            double rotCx, double rotCy,
+            int quarter,
+            PlayerColor color) {
+
+        int steps = quarterToRotationSteps(quarter);
+
+        double[] p1 = rotatePoint(x1, y1, rotCx, rotCy, steps);
+        double[] p2 = rotatePoint(x2, y2, rotCx, rotCy, steps);
+        double[] p3 = rotatePoint(x3, y3, rotCx, rotCy, steps);
+
+        int[] xs = {
+                (int) Math.round(p1[0]),
+                (int) Math.round(p2[0]),
+                (int) Math.round(p3[0])
+        };
+
+        int[] ys = {
+                (int) Math.round(p1[1]),
+                (int) Math.round(p2[1]),
+                (int) Math.round(p3[1])
+        };
+
+        g2.setColor(colorFor(color));
+        g2.fillPolygon(xs, ys, 3);
+
+        g2.setColor(Color.WHITE);
+        g2.drawPolygon(xs, ys, 3);
+    }
+
 
     private void drawTakeoffArea(Graphics2D g2, double x, double y, double side, PlayerColor color) {
         g2.setColor(colorFor(color));
@@ -460,6 +554,32 @@ public class GameBoardPanel extends JPanel {
         drawRotatedRect(g2, x2Left, y0 - S * 2.0, L, S, rotCx, rotCy, quarter, order[(baseIdx + 5) % 4]);
         drawRotatedTriangle(g2, x2Left, y0 - S * 4.0, L, TriangleCorner.TOP_LEFT, rotCx, rotCy, quarter, order[(baseIdx + 6) % 4]);
         drawRotatedTriangle(g2, x2Left, y0 - S * 4.0, L, TriangleCorner.BOTTOM_LEFT, rotCx, rotCy, quarter, order[(baseIdx + 7) % 4]);
+
+        double centerOffset = (L - S) / 2.0;
+
+        drawRotatedLightRect(
+                g2,
+                x2Left + centerOffset,
+                y0 - S * 4.0 - L,
+                S,
+                L,
+                rotCx,
+                rotCy,
+                quarter,
+                order[(baseIdx + 7) % 4]
+        );
+
+        drawRotatedLightRect(
+                g2,
+                x2Left + L,
+                y0 - S * 4.0 + centerOffset,
+                L,
+                S,
+                rotCx,
+                rotCy,
+                quarter,
+                order[(baseIdx + 6) % 4]
+        );
         drawRotatedRect(g2, x2Left - S, y0 - 2.0 * L, S, L, rotCx, rotCy, quarter, order[(baseIdx + 8) % 4]);
         drawRotatedRect(g2, x2Left - 2.0 * S, y0 - 2.0 * L, S, L, rotCx, rotCy, quarter, order[(baseIdx + 9) % 4]);
         drawRotatedTriangle(g2, x10Left, y0 - 2.0 * L, L, TriangleCorner.BOTTOM_RIGHT, rotCx, rotCy, quarter, order[(baseIdx + 10) % 4]);
@@ -474,6 +594,28 @@ public class GameBoardPanel extends JPanel {
         double nw = (steps % 2 == 0) ? w : h;
         double nh = (steps % 2 == 0) ? h : w;
         drawTrackRect(g2, c[0] - nw / 2.0, c[1] - nh / 2.0, nw, nh, color);
+    }
+
+    /** Draw rotated light rectangle. */
+    private void drawRotatedLightRect(
+            Graphics2D g2,
+            double x, double y,
+            double w, double h,
+            double cx, double cy,
+            int quarter,
+            PlayerColor color) {
+
+        int steps = quarterToRotationSteps(quarter);
+
+        double centerX = x + w / 2.0;
+        double centerY = y + h / 2.0;
+
+        double[] c = rotatePoint(centerX, centerY, cx, cy, steps);
+
+        double nw = (steps % 2 == 0) ? w : h;
+        double nh = (steps % 2 == 0) ? h : w;
+
+        drawLightRect(g2, c[0] - nw / 2.0, c[1] - nh / 2.0, nw, nh, color);
     }
 
     private void drawRotatedTriangle(Graphics2D g2, double left, double top, double leg, TriangleCorner corner, double cx, double cy, int quarter, PlayerColor color) {
@@ -519,6 +661,20 @@ public class GameBoardPanel extends JPanel {
     /**
      * Rectangle cell template (2:1). Vertical: w=S,h=L; Horizontal: w=L,h=S.
      */
+    /** Draw a light-colored rectangle cell without center dot. */
+    private void drawLightRect(Graphics2D g2, double x, double y, double w, double h, PlayerColor color) {
+        int ix = (int) Math.round(x);
+        int iy = (int) Math.round(y);
+        int iw = (int) Math.round(w);
+        int ih = (int) Math.round(h);
+
+        g2.setColor(lightColorFor(color));
+        g2.fillRect(ix, iy, iw, ih);
+
+        g2.setColor(Color.WHITE);
+        g2.drawRect(ix, iy, iw, ih);
+    }
+
     private void drawTrackRect(Graphics2D g2, double x, double y, double w, double h, PlayerColor zoneColor) {
         int ix = (int) Math.round(x), iy = (int) Math.round(y), iw = (int) Math.round(w), ih = (int) Math.round(h);
         g2.setColor(colorFor(zoneColor));
@@ -725,6 +881,22 @@ public class GameBoardPanel extends JPanel {
                 return new double[] { cx, h / 2.0 };
         }
     }
+    /** Lighter color for center helper rectangles. */
+    private Color lightColorFor(PlayerColor c) {
+        switch (c) {
+            case GREEN:
+                return new Color(0xA5, 0xD6, 0xA7); // light green
+            case RED:
+                return new Color(0xEF, 0x9A, 0x9A); // light red
+            case BLUE:
+                return new Color(0x90, 0xCA, 0xF9); // light blue
+            case YELLOW:
+                return new Color(0xFF, 0xF5, 0x9D); // light yellow
+            default:
+                return Color.LIGHT_GRAY;
+        }
+    }
+
     private Color colorFor(PlayerColor c) {
         switch (c) {
             case GREEN:
