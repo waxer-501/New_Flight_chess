@@ -116,6 +116,25 @@ public final class BoardConfig {
     }
 
     /**
+     * 判断某外圈索引是否为航道入口（局部索引 7，即 BOTTOM_LEFT 三角形）。
+     */
+    public static boolean isAirRouteEntry(int outerIndex) {
+        if (outerIndex < 0 || outerIndex >= OUTER_CELL_COUNT) {
+            return false;
+        }
+        return outerIndex % QUARTER_LENGTH == 7;
+    }
+
+    /**
+     * 根据航道入口索引，计算出口索引（顺时针下一个 quarter 的局部索引 6）。
+     */
+    public static int getAirRouteExit(int entryIndex) {
+        int quarter = entryIndex / QUARTER_LENGTH;
+        int nextQuarter = (quarter + 1) % 4;
+        return nextQuarter * QUARTER_LENGTH + 6;
+    }
+
+    /**
      * 判断某外圈索引是否处于指定玩家的 1/4 段内。
      */
     public static boolean isInQuarter(PlayerColor color, int outerIndex) {

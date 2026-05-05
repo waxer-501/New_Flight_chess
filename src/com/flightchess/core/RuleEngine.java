@@ -86,6 +86,7 @@ public class RuleEngine {
 
         boolean extraTurn = false;
         boolean captured = false;
+        boolean airRouted = false;
         int startIndex = BoardConfig.getStartIndex(color);
 
         if (piece.isInWaitingArea()) {
@@ -97,7 +98,7 @@ public class RuleEngine {
         } else if (piece.isInTakeoffArea()) {
             // 从起飞格出发：第 1 步到 startIndex，再走 dice-1 步
             int to = BoardConfig.moveForwardOnOuter(startIndex, dice - 1);
-            // 先吃子（若落点有敌人），再判断同色跳格
+            // 先吃子（若落点有敌人），再判断航道和同色跳格
             Set<Piece> capturedPieces = getPiecesAtOuterIndex(state, to, color, false);
             if (!capturedPieces.isEmpty()) {
                 captured = true;
@@ -106,8 +107,21 @@ public class RuleEngine {
                     enemy.setPositionIndex(-1);
                 }
             }
-            // 若落点格子颜色与棋子颜色相同，则再前进四格
-            if (color == BoardConfig.getCellColorAtOuterIndex(to)) {
+            // 航道入口跳转：落在外圈局部索引7且颜色匹配 → 跳到下一quarter局部索引6
+            if (BoardConfig.isAirRouteEntry(to) && color == BoardConfig.getCellColorAtOuterIndex(to)) {
+                to = BoardConfig.getAirRouteExit(to);
+                airRouted = true;
+                Set<Piece> airCaptured = getPiecesAtOuterIndex(state, to, color, false);
+                if (!airCaptured.isEmpty()) {
+                    captured = true;
+                    for (Piece enemy : airCaptured) {
+                        enemy.setCellType(CellType.WAITING_AREA);
+                        enemy.setPositionIndex(-1);
+                    }
+                }
+            }
+            // 若落点格子颜色与棋子颜色相同，则再前进四格（航道跳转后不触发）
+            if (!airRouted && color == BoardConfig.getCellColorAtOuterIndex(to)) {
                 to = BoardConfig.moveForwardOnOuter(to, 4);
                 // 跳后也检查是否有敌人
                 Set<Piece> jumpCaptured = getPiecesAtOuterIndex(state, to, color, false);
@@ -127,7 +141,7 @@ public class RuleEngine {
         } else if (piece.getCellType() == CellType.OUTER) {
             int from = piece.getPositionIndex();
             int to = BoardConfig.moveForwardOnOuter(from, dice);
-            // 先吃子（若落点有敌人），再判断同色跳格
+            // 先吃子（若落点有敌人），再判断航道和同色跳格
             Set<Piece> capturedPieces = getPiecesAtOuterIndex(state, to, color, false);
             if (!capturedPieces.isEmpty()) {
                 captured = true;
@@ -136,8 +150,21 @@ public class RuleEngine {
                     enemy.setPositionIndex(-1);
                 }
             }
-            // 若落点格子颜色与棋子颜色相同，则再前进四格
-            if (color == BoardConfig.getCellColorAtOuterIndex(to)) {
+            // 航道入口跳转：落在外圈局部索引7且颜色匹配 → 跳到下一quarter局部索引6
+            if (BoardConfig.isAirRouteEntry(to) && color == BoardConfig.getCellColorAtOuterIndex(to)) {
+                to = BoardConfig.getAirRouteExit(to);
+                airRouted = true;
+                Set<Piece> airCaptured = getPiecesAtOuterIndex(state, to, color, false);
+                if (!airCaptured.isEmpty()) {
+                    captured = true;
+                    for (Piece enemy : airCaptured) {
+                        enemy.setCellType(CellType.WAITING_AREA);
+                        enemy.setPositionIndex(-1);
+                    }
+                }
+            }
+            // 若落点格子颜色与棋子颜色相同，则再前进四格（航道跳转后不触发）
+            if (!airRouted && color == BoardConfig.getCellColorAtOuterIndex(to)) {
                 to = BoardConfig.moveForwardOnOuter(to, 4);
                 // 跳后也检查是否有敌人
                 Set<Piece> jumpCaptured = getPiecesAtOuterIndex(state, to, color, false);
