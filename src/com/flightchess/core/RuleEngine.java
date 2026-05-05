@@ -92,6 +92,7 @@ public class RuleEngine {
             // 摇到 6 并选择飞机：先进入起飞格，不直接上外圈
             piece.setCellType(CellType.TAKEOFF);
             piece.setPositionIndex(BoardConfig.getTakeoffIndex(color));
+            piece.setHasEverLeftWaitingArea(true);
             extraTurn = true;
         } else if (piece.isInTakeoffArea()) {
             // 从起飞格出发：第 1 步到 startIndex，再走 dice-1 步

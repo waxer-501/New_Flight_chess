@@ -28,6 +28,9 @@ public class Piece implements Serializable {
      */
     private int positionIndex;
 
+    /** 是否曾经离开过等待区（起飞过），用于死亡判定 —— 只有起飞过的棋子全部归巢才算死亡。 */
+    private boolean hasEverLeftWaitingArea = false;
+
     public Piece(PlayerColor owner) {
         this.owner = owner;
         this.cellType = CellType.WAITING_AREA;
@@ -60,6 +63,14 @@ public class Piece implements Serializable {
 
     public boolean isInTakeoffArea() {
         return cellType == CellType.TAKEOFF;
+    }
+
+    public boolean hasEverLeftWaitingArea() {
+        return hasEverLeftWaitingArea;
+    }
+
+    public void setHasEverLeftWaitingArea(boolean v) {
+        this.hasEverLeftWaitingArea = v;
     }
 }
 

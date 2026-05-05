@@ -180,6 +180,10 @@ public class UiController {
         send(new Message(MessageType.DEBUG_DICE, roomId, playerId, 0L, dice));
     }
 
+    public void debugTogglePhase() {
+        send(new Message(MessageType.DEBUG_PHASE_TOGGLE, roomId, playerId, 0L, null));
+    }
+
     public void toggleReady() {
         send(new Message(MessageType.PLAYER_READY, roomId, playerId, 0L, null));
     }
