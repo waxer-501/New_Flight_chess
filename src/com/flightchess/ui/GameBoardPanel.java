@@ -36,17 +36,14 @@ public class GameBoardPanel extends JPanel {
 
     private static final double BOARD_SIZE = 1080.0;
 
-
-    private static final double BOARD_SCALE = 0.83;
-
 /** 13 cells per side, matching 52 outer cells. */
     private static final int OUTER_SIDE = 13;
 
-/** Long edge of a 2:1 rectangular cell. */
-    private static final double CELL_LONG = BOARD_SIZE / 8.5 * BOARD_SCALE;
+/** Long edge of a 2:1 rectangular cell, recomputed in paintComponent. */
+    private double cellLong = BOARD_SIZE / 8.5;
 
-/** Short edge of a 2:1 rectangular cell. */
-    private static final double CELL_SHORT = CELL_LONG / 2;
+/** Short edge of a 2:1 rectangular cell, recomputed in paintComponent. */
+    private double cellShort = cellLong / 2;
 
     private GameState gameState;
 
@@ -109,7 +106,7 @@ public class GameBoardPanel extends JPanel {
                 if (lastDiceResult <= 0 || lastDiceRollerColor == null || gameState.getCurrentTurn() != lastDiceRollerColor) return;
                 List<Integer> movable = ruleEngine.listMovablePieces(gameState, lastDiceRollerColor, lastDiceResult);
                 if (movable == null || movable.isEmpty()) return;
-                int size = (int) Math.max(16, CELL_LONG * 0.45);
+                int size = (int) Math.max(16, cellLong * 0.45);
                 int mx = e.getX(), my = e.getY();
                 for (PlayerColor color : PlayerColor.ordered()) {
                     if (color != lastDiceRollerColor) continue;
@@ -198,6 +195,12 @@ public class GameBoardPanel extends JPanel {
 
         int w = getWidth();
         int h = getHeight();
+
+        // 根据面板实际尺寸动态计算缩放，避免不同DPI下棋盘错位
+        double scale = Math.min(w, h) / BOARD_SIZE;
+        cellLong = BOARD_SIZE / 8.5 * scale;
+        cellShort = cellLong / 2;
+
         double cx = w / 2.0;
         double cy = h / 2.0;
 
@@ -207,7 +210,7 @@ public class GameBoardPanel extends JPanel {
             quarterCenterY[i] = (int) Math.round(cy);
         }
 
-        double halfOuter = OUTER_SIDE * CELL_LONG / 2.0;
+        double halfOuter = OUTER_SIDE * cellLong / 2.0;
         double left = cx - halfOuter;
         double top = cy - halfOuter;
         double right = cx + halfOuter;
@@ -220,7 +223,7 @@ public class GameBoardPanel extends JPanel {
 
     /** Draw four birth zones and matching takeoff markers. */
     private void drawBirthPoints(Graphics2D g2, int w, int h) {
-        int side = (int) Math.round(CELL_LONG * 2.0);
+        int side = (int) Math.round(cellLong * 2.0);
         int[] xs = { 0, w - side, w - side, 0 };
         int[] ys = { 0, 0, h - side, h - side };
         int[] takeoffXs = { 0, (int) Math.round(w - side / 3.5 * 4.5), (int) Math.round(w - side / 3.5), side }; // Keep consistent with drawTakeoffArea radius math.
@@ -254,7 +257,7 @@ public class GameBoardPanel extends JPanel {
         }
         int w = getWidth() > 0 ? getWidth() : (int) Math.round(BOARD_SIZE);
         int h = getHeight() > 0 ? getHeight() : (int) Math.round(BOARD_SIZE);
-        int side = (int) Math.round(CELL_LONG * 2.0);
+        int side = (int) Math.round(cellLong * 2.0);
         int half = side / 2;
         int[] cx = { half, w - half, w - half, half };
         int[] cy = { half, half, h - half, h - half };
@@ -266,7 +269,7 @@ public class GameBoardPanel extends JPanel {
         if (birthIndex < 0 || birthIndex > 3 || slot < 0 || slot > 3) return new int[] { 0, 0 };
         int w = getWidth() > 0 ? getWidth() : (int) Math.round(BOARD_SIZE);
         int h = getHeight() > 0 ? getHeight() : (int) Math.round(BOARD_SIZE);
-        int side = (int) Math.round(CELL_LONG * 2.0);
+        int side = (int) Math.round(cellLong * 2.0);
         double r = side / 7.0;
         int[] cellX = { 0, w - side, w - side, 0 };
         int[] cellY = { 0, 0, h - side, h - side };
@@ -290,7 +293,7 @@ public class GameBoardPanel extends JPanel {
     private int[] takeoffIndexToPixel(int takeoffIndex) {
         int w = getWidth() > 0 ? getWidth() : (int) Math.round(BOARD_SIZE);
         int h = getHeight() > 0 ? getHeight() : (int) Math.round(BOARD_SIZE);
-        int side = (int) Math.round(CELL_LONG * 2.0);
+        int side = (int) Math.round(cellLong * 2.0);
         int[] takeoffXs = {
             0,
             (int) Math.round(w - side / 3.5 * 4.5),
@@ -320,7 +323,7 @@ public class GameBoardPanel extends JPanel {
     /** Draw pieces; hover movable piece to show black ring hint. */
     private void drawPieces(Graphics2D g2) {
         if (gameState == null) return;
-        int size = (int) Math.max(16, CELL_LONG * 0.45);
+        int size = (int) Math.max(16, cellLong * 0.45);
         List<Integer> movable = null;
         if (lastDiceResult > 0 && lastDiceRollerColor != null && gameState.getCurrentTurn() == lastDiceRollerColor) {
             movable = ruleEngine.listMovablePieces(gameState, lastDiceRollerColor, lastDiceResult);
@@ -364,8 +367,8 @@ public class GameBoardPanel extends JPanel {
     private void drawOuterTrack(Graphics2D g2, double left, double top, double right, double bottom) {
         double cx = getWidth() / 2.0;
         double h = getHeight();
-        double L = CELL_LONG;
-        double S = CELL_SHORT;
+        double L = cellLong;
+        double S = cellShort;
         PlayerColor[] order = PlayerColor.ordered();
         // Index 0: center-bottom vertical rectangle.
         double x0 = cx - S / 2.0;
@@ -529,7 +532,7 @@ public class GameBoardPanel extends JPanel {
 
     /** Birth-zone template: square, (x,y) is top-left. */
     private void drawBirthPointCell(Graphics2D g2, int x, int y, PlayerColor zoneColor) {
-        int side = (int) Math.round(CELL_LONG * 2.0);
+        int side = (int) Math.round(cellLong * 2.0);
         g2.setColor(colorFor(zoneColor));
         g2.fillRect(x, y, side, side);
         g2.setColor(Color.WHITE);
@@ -631,8 +634,8 @@ public class GameBoardPanel extends JPanel {
     private double[] getSegment0CellBounds(int localIdx) {
         double cx = getWidth() / 2.0;
         double h = getHeight();
-        double L = CELL_LONG;
-        double S = CELL_SHORT;
+        double L = cellLong;
+        double S = cellShort;
         double y0 = h - L;
         double x2Left = cx - 7.0 * S / 2.0 - S;
         double x10Left = x2Left - 2.0 * L;
@@ -671,8 +674,8 @@ public class GameBoardPanel extends JPanel {
         }
         double cx = getWidth() / 2.0;
         double h = getHeight();
-        double L = CELL_LONG;
-        double S = CELL_SHORT;
+        double L = cellLong;
+        double S = cellShort;
         int quarter = index / 13;
         int localIdx = index % 13;
         double[] base = outerQuarter0Center(cx, h, L, S, localIdx);
