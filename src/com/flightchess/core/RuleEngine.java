@@ -64,6 +64,119 @@ public class RuleEngine {
     }
 
     /**
+     * 获取某棋子在当前棋盘上的所有相邻可达位置（用于突然死亡模式步控）。
+     * 每个返回元素为 int[]{ cellTypeOrdinal, positionIndex }。
+     * 覆盖外圈、起飞格、终点通道、中心四格。
+     */
+    public List<int[]> getAdjacentPositions(GameState state, Piece piece) {
+        List<int[]> result = new ArrayList<>();
+        if (piece == null) return result;
+        if (piece.getCellType() == CellType.OUTER) {
+            int pos = piece.getPositionIndex();
+            result.add(new int[]{ CellType.OUTER.ordinal(), BoardConfig.moveBackwardOnOuter(pos, 1) });
+            result.add(new int[]{ CellType.OUTER.ordinal(), BoardConfig.moveForwardOnOuter(pos, 1) });
+            // 若当前格是路口，加入终点通道入口
+            if (BoardConfig.isJunction(pos)) {
+                PlayerColor jColor = BoardConfig.getJunctionColor(pos);
+                int cp = BoardConfig.encodeCenterPathPos(jColor, 0);
+                if (cp >= 0) {
+                    result.add(new int[]{ CellType.CENTER_PATH.ordinal(), cp });
+                }
+            }
+        } else if (piece.getCellType() == CellType.TAKEOFF) {
+            int startIdx = BoardConfig.getStartIndex(piece.getOwner());
+            result.add(new int[]{ CellType.OUTER.ordinal(), startIdx });
+        } else if (piece.getCellType() == CellType.CENTER_PATH) {
+            int pos = piece.getPositionIndex();
+            PlayerColor pathColor = BoardConfig.decodeCenterPathColor(pos);
+            int step = BoardConfig.decodeCenterPathStep(pos);
+            if (pathColor == null || step < 0) return result;
+            // 外层方向
+            int prev = BoardConfig.getFinishLanePrev(pathColor, step);
+            if (prev >= 0) {
+                result.add(new int[]{ CellType.CENTER_PATH.ordinal(),
+                        BoardConfig.encodeCenterPathPos(pathColor, prev) });
+            } else if (step == 0) {
+                // 最外层 ←→ 外圈路口
+                int junction = BoardConfig.getJunctionIndex(pathColor);
+                if (junction >= 0) {
+                    result.add(new int[]{ CellType.OUTER.ordinal(), junction });
+                }
+            }
+            // 内层方向
+            int next = BoardConfig.getFinishLaneNext(pathColor, step);
+            if (next >= 0) {
+                result.add(new int[]{ CellType.CENTER_PATH.ordinal(),
+                        BoardConfig.encodeCenterPathPos(pathColor, next) });
+            } else if (step == BoardConfig.FINISH_LANE_LENGTH - 1) {
+                // 最内层 ←→ 中心格
+                int ci = BoardConfig.colorToCenterIndex(pathColor);
+                if (ci >= 0) {
+                    result.add(new int[]{ CellType.CENTER.ordinal(), ci });
+                }
+            }
+        } else if (piece.getCellType() == CellType.CENTER) {
+            // 中心四格：四个方向分别通往四条终点通道的最内层
+            for (PlayerColor pc : PlayerColor.ordered()) {
+                int cp = BoardConfig.encodeCenterPathPos(pc, BoardConfig.FINISH_LANE_LENGTH - 1);
+                if (cp >= 0) {
+                    result.add(new int[]{ CellType.CENTER_PATH.ordinal(), cp });
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 突然死亡模式：将棋子向目标位置移动一步（不消耗骰子，由调用方递减 remainingSteps）。
+     * 自动处理吃子。
+     *
+     * @return true 如果移动成功
+     */
+    /**
+     * 突然死亡模式：将棋子向目标位置移动一步（不消耗骰子，由调用方递减 remainingSteps）。
+     * 自动处理吃子。
+     *
+     * @return true 如果移动成功
+     */
+    public boolean moveOneStep(GameState state, PlayerColor color, int pieceIndex,
+                                int targetCellTypeOrdinal, int targetPosition) {
+        Player player = state.getPlayer(color);
+        if (player == null) return false;
+        if (pieceIndex < 0 || pieceIndex >= player.getPieces().size()) return false;
+        Piece piece = player.getPieces().get(pieceIndex);
+
+        // 检查目标位置是否相邻
+        List<int[]> adjacent = getAdjacentPositions(state, piece);
+        boolean valid = false;
+        for (int[] adj : adjacent) {
+            if (adj[0] == targetCellTypeOrdinal && adj[1] == targetPosition) {
+                valid = true;
+                break;
+            }
+        }
+        if (!valid) return false;
+
+        CellType targetType = CellType.values()[targetCellTypeOrdinal];
+
+        // 吃子：目标位置若有敌方棋子则全部打回等待区
+        for (Player p : state.getPlayersInOrder()) {
+            if (p.getColor() == color) continue;
+            for (Piece enemy : p.getPieces()) {
+                if (enemy.getCellType() == targetType && enemy.getPositionIndex() == targetPosition) {
+                    enemy.setCellType(CellType.WAITING_AREA);
+                    enemy.setPositionIndex(-1);
+                }
+            }
+        }
+
+        piece.setCellType(targetType);
+        piece.setPositionIndex(targetPosition);
+        piece.setHasEverLeftWaitingArea(true);
+        return true;
+    }
+
+    /**
      * 执行一次移动，返回是否获得额外回合（掷到 6 或吃子等）。
      *
      * - 等待区 + 掷 6：进入本方起飞格（TAKEOFF），可再掷一次；

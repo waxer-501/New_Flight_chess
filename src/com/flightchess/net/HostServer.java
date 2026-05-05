@@ -17,6 +17,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import com.flightchess.core.AIController;
+import com.flightchess.core.BoardConfig;
+import com.flightchess.core.CellType;
 import com.flightchess.core.GamePhase;
 import com.flightchess.core.GameState;
 import com.flightchess.core.Piece;
@@ -56,6 +58,9 @@ public class HostServer {
 
     /** 同一时间只处理一次移动请求，避免双击等导致两子同时移动。 */
     private final Object moveRequestLock = new Object();
+
+    /** 突然死亡模式下记录原始骰子值（用于步数用完后的额外回合判定）。 */
+    private volatile int suddenDeathOriginalDice = 0;
 
     private volatile boolean running = false;
 
@@ -186,6 +191,9 @@ public class HostServer {
                     break;
                 case MOVE_REQUEST:
                     handleMoveRequest(msg);
+                    break;
+                case STEP_MOVE:
+                    handleStepMove(msg);
                     break;
                 case PING:
                     break;
@@ -445,12 +453,76 @@ public class HostServer {
                 if (movable == null || !movable.contains(pieceIndex)) {
                     return;
                 }
-                MoveResult result = ruleEngine.movePiece(gameState, actorColor, pieceIndex, pendingDiceResult);
+                int dice = pendingDiceResult;
+
+                if (gameState.getPhase() == GamePhase.SUDDEN_DEATH) {
+                    // 突然死亡模式：进入步控模式，不自动走完骰子步数
+                    Piece piece = gameState.getPlayer(actorColor).getPieces().get(pieceIndex);
+                    if (piece.isInWaitingArea()) {
+                        // 掷 6 起飞：移到起飞格
+                        if (dice == 6) {
+                            piece.setCellType(CellType.TAKEOFF);
+                            piece.setPositionIndex(BoardConfig.getTakeoffIndex(actorColor));
+                            piece.setHasEverLeftWaitingArea(true);
+                        } else {
+                            return; // 等待区非 6 不可移动
+                        }
+                    }
+                    gameState.setRemainingSteps(dice);
+                    gameState.setSelectedPieceIndex(pieceIndex);
+                    suddenDeathOriginalDice = dice;
+                    pendingDiceResult = null;
+                    pendingRollerId = null;
+                    checkSuddenDeathTrigger();
+                    broadcast(new Message(MessageType.GAME_STATE_SNAPSHOT, roomId, msg.getPlayerId(), 0L, gameState));
+                    runAITurnIfNeeded();
+                    return;
+                }
+
+                MoveResult result = ruleEngine.movePiece(gameState, actorColor, pieceIndex, dice);
                 pendingDiceResult = null;
                 pendingRollerId = null;
                 checkSuddenDeathTrigger();
                 if (!result.isExtraTurn()) {
                     rotateTurn();
+                }
+                broadcast(new Message(MessageType.GAME_STATE_SNAPSHOT, roomId, msg.getPlayerId(), 0L, gameState));
+                runAITurnIfNeeded();
+            }
+        }
+
+        /** 突然死亡模式：处理客户端发来的单步步控方向。 */
+        private void handleStepMove(Message msg) {
+            synchronized (moveRequestLock) {
+                if (gameState == null || gameState.getPhase() != GamePhase.SUDDEN_DEATH) return;
+                if (gameState.getRemainingSteps() <= 0) return;
+                if (gameState.getSelectedPieceIndex() < 0) return;
+
+                PlayerColor color = gameState.getCurrentTurn();
+                if (playerColors.get(msg.getPlayerId()) != color) return;
+
+                Object payload = msg.getPayload();
+                if (!(payload instanceof int[])) return;
+                int[] target = (int[]) payload;
+                if (target.length != 2) return;
+
+                int pieceIndex = gameState.getSelectedPieceIndex();
+                boolean moved = ruleEngine.moveOneStep(gameState, color, pieceIndex, target[0], target[1]);
+                if (!moved) return;
+
+                int remaining = gameState.getRemainingSteps() - 1;
+                gameState.setRemainingSteps(remaining);
+
+                if (remaining <= 0) {
+                    gameState.setSelectedPieceIndex(-1);
+                    checkSuddenDeathTrigger();
+                    if (suddenDeathOriginalDice == 6) {
+                        suddenDeathOriginalDice = 0;
+                        // 掷 6 额外回合，不转回合
+                    } else {
+                        suddenDeathOriginalDice = 0;
+                        rotateTurn();
+                    }
                 }
                 broadcast(new Message(MessageType.GAME_STATE_SNAPSHOT, roomId, msg.getPlayerId(), 0L, gameState));
                 runAITurnIfNeeded();
@@ -577,6 +649,10 @@ public class HostServer {
         if (gameState == null || roomInfo == null) {
             return;
         }
+        // 转回合时清理步控状态
+        gameState.setRemainingSteps(0);
+        gameState.setSelectedPieceIndex(-1);
+        suddenDeathOriginalDice = 0;
         PlayerColor current = gameState.getCurrentTurn();
         PlayerColor[] order = PlayerColor.ordered();
         int idx = 0;

@@ -114,17 +114,8 @@ public class GameBoardPanel extends JPanel {
                     if (player == null) continue;
                     int slot = 0;
                     for (Piece piece : player.getPieces()) {
-                        int[] xy;
-                        if (piece.getCellType() == CellType.WAITING_AREA) {
-                            xy = birthPointSlotToPixel(colorToBirthIndex(color), slot);
-                        } else if (piece.getCellType() == CellType.TAKEOFF) {
-                            xy = takeoffIndexToPixel(piece.getPositionIndex());
-                        } else if (piece.getCellType() == CellType.OUTER) {
-                            xy = outerIndexToPixel(piece.getPositionIndex(), 0, 0, 0, 0);
-                        } else {
-                            slot++;
-                            continue;
-                        }
+                        int[] xy = pieceToPixel(piece, slot);
+                        if (xy == null) { slot++; continue; }
                         int x = xy[0] - size / 2, y = xy[1] - size / 2;
                         if (mx >= x && mx < x + size && my >= y && my < y + size && movable.contains(slot)) {
                             moveRequestPending = true;
@@ -160,9 +151,88 @@ public class GameBoardPanel extends JPanel {
         this.rollerIsLocal = local;
     }
 
-    /** Set callback when clicking a movable piece (index 0~3). */
     public void setOnMovablePieceClick(IntConsumer listener) {
         this.onMovablePieceClick = listener;
+    }
+
+    // ===== 突然死亡模式步控 =====
+
+    /** 是否处于步控模式（已选子，等待键盘方向）。 */
+    private boolean stepControlActive = false;
+
+    public void setStepControlActive(boolean active) {
+        this.stepControlActive = active;
+        repaint();
+    }
+
+    /** 获取当前选中棋子的相邻可达位置（用于键盘映射），空列表表示无选项。 */
+    public List<int[]> getAdjacentForSelectedPiece() {
+        if (gameState == null || gameState.getSelectedPieceIndex() < 0) return List.of();
+        PlayerColor color = gameState.getCurrentTurn();
+        Player player = gameState.getPlayer(color);
+        if (player == null) return List.of();
+        List<Piece> pieces = player.getPieces();
+        int idx = gameState.getSelectedPieceIndex();
+        if (idx < 0 || idx >= pieces.size()) return List.of();
+        return ruleEngine.getAdjacentPositions(gameState, pieces.get(idx));
+    }
+
+    /** 根据按键返回对应的相邻目标。中心格时 ↑↓←→ 直连四条终点通道。 */
+    public int[] getAdjacentForKey(int vkCode) {
+        if (gameState == null || gameState.getSelectedPieceIndex() < 0) return null;
+        PlayerColor color = gameState.getCurrentTurn();
+        Player player = gameState.getPlayer(color);
+        if (player == null) return null;
+        List<Piece> pieces = player.getPieces();
+        int idx = gameState.getSelectedPieceIndex();
+        if (idx < 0 || idx >= pieces.size()) return null;
+        Piece piece = pieces.get(idx);
+        List<int[]> targets = ruleEngine.getAdjacentPositions(gameState, piece);
+
+        // 中心格：↑↓←→ 直接映射到 BLUE/GREEN/RED/YELLOW 终点通道
+        if (piece.getCellType() == CellType.CENTER && targets.size() >= 4) {
+            // targets 顺序 = [GREEN, RED, BLUE, YELLOW]
+            switch (vkCode) {
+                case java.awt.event.KeyEvent.VK_UP:    return targets.get(2); // BLUE
+                case java.awt.event.KeyEvent.VK_DOWN:  return targets.get(0); // GREEN
+                case java.awt.event.KeyEvent.VK_LEFT:  return targets.get(1); // RED
+                case java.awt.event.KeyEvent.VK_RIGHT: return targets.get(3); // YELLOW
+            }
+        }
+
+        // 其他格子：普通索引映射
+        if (targets.isEmpty()) return null;
+        // 有 3+ 个方向时 ↑ 取第三个
+        if (vkCode == java.awt.event.KeyEvent.VK_UP && targets.size() >= 3) {
+            return targets.get(2);
+        }
+        // 有 2 个方向时 ← 取第一个(顺时针)，→ 取第二个(逆时针)
+        if (vkCode == java.awt.event.KeyEvent.VK_LEFT && targets.size() >= 2) {
+            return targets.get(1);  // ← = 顺时针
+        }
+        if (vkCode == java.awt.event.KeyEvent.VK_RIGHT) {
+            return targets.get(0);  // → = 逆时针
+        }
+        if (vkCode == java.awt.event.KeyEvent.VK_LEFT) {
+            return targets.get(0);  // 仅 1 个方向时 ← 也可用
+        }
+        return null;
+    }
+
+    /** Get pixel center of a piece, or null if invalid position. */
+    private int[] pieceToPixel(Piece piece, int slot) {
+        if (piece.getCellType() == CellType.WAITING_AREA) {
+            return birthPointSlotToPixel(colorToBirthIndex(piece.getOwner()), slot);
+        } else if (piece.getCellType() == CellType.TAKEOFF) {
+            return takeoffIndexToPixel(piece.getPositionIndex());
+        } else if (piece.getCellType() == CellType.OUTER) {
+            return outerIndexToPixel(piece.getPositionIndex(), 0, 0, 0, 0);
+        } else if (piece.getCellType() == CellType.CENTER_PATH) {
+            return stepTargetPixel(CellType.CENTER_PATH.ordinal(), piece.getPositionIndex());
+        } else if (piece.getCellType() == CellType.CENTER) {
+            return stepTargetPixel(CellType.CENTER.ordinal(), piece.getPositionIndex());
+        }
+        return null;
     }
 
     /** Set piece image for one color. */
@@ -219,6 +289,9 @@ public class GameBoardPanel extends JPanel {
         drawBirthPoints(g2, w, h);
         drawOuterTrack(g2, left, top, right, bottom);
         drawPieces(g2);
+        if (stepControlActive) {
+            drawStepTargets(g2);
+        }
     }
 
     /** Draw four birth zones and matching takeoff markers. */
@@ -335,17 +408,8 @@ public class GameBoardPanel extends JPanel {
             if (player == null) continue;
             int slot = 0;
             for (Piece piece : player.getPieces()) {
-                int[] xy;
-                if (piece.getCellType() == CellType.WAITING_AREA) {
-                    xy = birthPointSlotToPixel(colorToBirthIndex(color), slot);
-                } else if (piece.getCellType() == CellType.TAKEOFF) {
-                    xy = takeoffIndexToPixel(piece.getPositionIndex());
-                } else if (piece.getCellType() == CellType.OUTER) {
-                    xy = outerIndexToPixel(piece.getPositionIndex(), 0, 0, 0, 0);
-                } else {
-                    slot++;
-                    continue;
-                }
+                int[] xy = pieceToPixel(piece, slot);
+                if (xy == null) { slot++; continue; }
                 int x = xy[0] - size / 2, y = xy[1] - size / 2;
                 Shape oldClip = g2.getClip();
                 g2.setClip(new Ellipse2D.Double(x, y, size, size));
@@ -362,6 +426,40 @@ public class GameBoardPanel extends JPanel {
                 slot++;
             }
         }
+    }
+
+    /** 步控模式下，用绿色大圈标出相邻可走格子（支持外圈、终点通道、中心格）。 */
+    private void drawStepTargets(Graphics2D g2) {
+        List<int[]> targets = getAdjacentForSelectedPiece();
+        if (targets.isEmpty()) return;
+        int r = (int) Math.max(14, cellLong * 0.4);
+        g2.setColor(new Color(0x00, 0xCC, 0x00, 0xAA));
+        g2.setStroke(new BasicStroke(3f));
+        for (int[] tgt : targets) {
+            int cellTypeOrdinal = tgt[0];
+            int posIndex = tgt[1];
+            int[] xy = stepTargetPixel(cellTypeOrdinal, posIndex);
+            if (xy == null) continue;
+            g2.drawOval(xy[0] - r, xy[1] - r, r * 2, r * 2);
+            g2.setColor(new Color(0x00, 0xCC, 0x00, 0x30));
+            g2.fillOval(xy[0] - r, xy[1] - r, r * 2, r * 2);
+            g2.setColor(new Color(0x00, 0xCC, 0x00, 0xAA));
+        }
+    }
+
+    /** 根据 cellType 和 positionIndex 计算步控目标像素坐标。 */
+    private int[] stepTargetPixel(int cellTypeOrdinal, int posIndex) {
+        if (cellTypeOrdinal == CellType.OUTER.ordinal()) {
+            return outerIndexToPixel(posIndex, 0, 0, 0, 0);
+        } else if (cellTypeOrdinal == CellType.CENTER_PATH.ordinal()) {
+            PlayerColor c = com.flightchess.core.BoardConfig.decodeCenterPathColor(posIndex);
+            int step = com.flightchess.core.BoardConfig.decodeCenterPathStep(posIndex);
+            if (c == null || step < 0) return null;
+            return finishLaneIndexToPixel(c, step);
+        } else if (cellTypeOrdinal == CellType.CENTER.ordinal()) {
+            return centerIndexToPixel(posIndex);
+        }
+        return null;
     }
 
     private void drawOuterTrack(Graphics2D g2, double left, double top, double right, double bottom) {
@@ -821,6 +919,51 @@ public class GameBoardPanel extends JPanel {
         double nw = (steps % 2 == 0) ? w : h;
         double nh = (steps % 2 == 0) ? h : w;
         return new double[] { c[0] - nw / 2.0, c[1] - nh / 2.0, nw, nh };
+    }
+
+    /** 终点通道格子像素坐标：laneIdx = 0~4，0 最外（近外圈），4 最内（近中心）。 */
+    private int[] finishLaneIndexToPixel(PlayerColor color, int laneIdx) {
+        double cx = getWidth() / 2.0;
+        double h = getHeight();
+        double L = cellLong;
+        double S = cellShort;
+        double y0 = h - L;
+        // 未旋转时的中心坐标：终点通道第 laneIdx 格的正中心（laneIdx=0 对应 drawing cell 1）
+        double bx = cx;
+        double by = y0 - laneIdx * S - 0.5 * S;
+        PlayerColor[] order = PlayerColor.ordered();
+        int quarter = -1;
+        for (int i = 0; i < order.length; i++) {
+            if (order[i] == color) { quarter = i; break; }
+        }
+        if (quarter <= 0) {
+            return new int[]{ (int) Math.round(bx), (int) Math.round(by) };
+        }
+        double rotCx = quarterCenterX[quarter] >= 0 ? quarterCenterX[quarter] : cx;
+        double rotCy = quarterCenterY[quarter] >= 0 ? quarterCenterY[quarter] : h / 2.0;
+        int steps = quarterToRotationSteps(quarter);
+        double[] r = rotatePoint(bx, by, rotCx, rotCy, steps);
+        return new int[]{ (int) Math.round(r[0]), (int) Math.round(r[1]) };
+    }
+
+    /** 中心四格像素坐标：centerIdx = 0(GREEN) / 1(RED) / 2(BLUE) / 3(YELLOW)。 */
+    private int[] centerIndexToPixel(int centerIdx) {
+        double cx = getWidth() / 2.0;
+        double h = getHeight();
+        double L = cellLong;
+        double S = cellShort;
+        double y0 = h - L;
+        // 未旋转时的中心格位置：终点通道三角形尖端 (cx, y0 - 6.5*S)
+        double bx = cx;
+        double by = y0 - 6.5 * S;
+        if (centerIdx <= 0) {
+            return new int[]{ (int) Math.round(bx), (int) Math.round(by) };
+        }
+        double rotCx = cx;
+        double rotCy = h / 2.0;
+        int steps = centerIdx; // 每色旋转 N×90°
+        double[] r = rotatePoint(bx, by, rotCx, rotCy, steps);
+        return new int[]{ (int) Math.round(r[0]), (int) Math.round(r[1]) };
     }
 
     /** Convert outer-track index to cell center pixel, matching drawOuterTrack layout. */
