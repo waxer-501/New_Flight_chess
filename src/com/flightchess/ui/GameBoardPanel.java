@@ -393,10 +393,96 @@ public class GameBoardPanel extends JPanel {
         drawTrackRect(g2, x10Left, y0 - 2.0 * L - S, L, S, order[11 % 4]);
         drawTrackRect(g2, x10Left, y0 - 2.0 * L - S * 2.0, L, S, order[12 % 4]);
 
+        // 画底部绿色终点通道：5 个 S×S 正方形 + 一个等腰三角形
+        drawFinishLane(g2, x0, y0, S, 0, PlayerColor.GREEN);
+
+        // 旋转生成另外三个方向的外圈轨道
         for (int q = 1; q <= 3; q++) {
             drawQuarterRotated(g2, cx, h, q, L, S, order);
         }
+
+// 旋转生成另外三个方向的终点通道
+        drawFinishLane(g2, x0, y0, S, 1, PlayerColor.RED);
+        drawFinishLane(g2, x0, y0, S, 2, PlayerColor.BLUE);
+        drawFinishLane(g2, x0, y0, S, 3, PlayerColor.YELLOW);
     }
+
+    /**
+     * Draw finish lane: 5 square cells above the rightmost vertical rectangle,
+     * plus an isosceles triangle on top.
+     *
+     * @param baseX   x of the rightmost vertical outer-track rectangle
+     * @param baseY   y of the rightmost vertical outer-track rectangle
+     * @param S       short side length, also used as square side length
+     * @param quarter 0=bottom, 1=left, 2=top, 3=right
+     * @param color   lane color
+     */
+    private void drawFinishLane(Graphics2D g2, double baseX, double baseY, double S, int quarter, PlayerColor color) {
+        double rotCx = quarterCenterX[quarter] >= 0 ? quarterCenterX[quarter] : getWidth() / 2.0;
+        double rotCy = quarterCenterY[quarter] >= 0 ? quarterCenterY[quarter] : getHeight() / 2.0;
+
+        // 5 个正方形，紧贴在右侧竖向长方形格子的上方
+        for (int i = 1; i <= 5; i++) {
+            double x = baseX;
+            double y = baseY - i * S;
+            drawRotatedRect(g2, x, y, S, S, rotCx, rotCy, quarter, color);
+        }
+
+        // 等腰三角形：
+        // 底边 = 3S，高 = 1.5S
+        // 底边贴在第 5 个正方形的上边
+        double baseCenterX = baseX + S / 2.0;
+        double baseLineY = baseY - 5.0 * S;
+        double triangleBase = 3.0 * S;
+        double triangleHeight = 1.5 * S;
+
+        double x1 = baseCenterX - triangleBase / 2.0;
+        double y1 = baseLineY;
+
+        double x2 = baseCenterX + triangleBase / 2.0;
+        double y2 = baseLineY;
+
+        double x3 = baseCenterX;
+        double y3 = baseLineY - triangleHeight;
+
+        drawRotatedIsoscelesTriangle(g2, x1, y1, x2, y2, x3, y3, rotCx, rotCy, quarter, color);
+    }
+
+    /** Draw rotated isosceles triangle. */
+    private void drawRotatedIsoscelesTriangle(
+            Graphics2D g2,
+            double x1, double y1,
+            double x2, double y2,
+            double x3, double y3,
+            double rotCx, double rotCy,
+            int quarter,
+            PlayerColor color) {
+
+        int steps = quarterToRotationSteps(quarter);
+
+        double[] p1 = rotatePoint(x1, y1, rotCx, rotCy, steps);
+        double[] p2 = rotatePoint(x2, y2, rotCx, rotCy, steps);
+        double[] p3 = rotatePoint(x3, y3, rotCx, rotCy, steps);
+
+        int[] xs = {
+                (int) Math.round(p1[0]),
+                (int) Math.round(p2[0]),
+                (int) Math.round(p3[0])
+        };
+
+        int[] ys = {
+                (int) Math.round(p1[1]),
+                (int) Math.round(p2[1]),
+                (int) Math.round(p3[1])
+        };
+
+        g2.setColor(colorFor(color));
+        g2.fillPolygon(xs, ys, 3);
+
+        g2.setColor(Color.WHITE);
+        g2.drawPolygon(xs, ys, 3);
+    }
+
 
     private void drawTakeoffArea(Graphics2D g2, double x, double y, double side, PlayerColor color) {
         g2.setColor(colorFor(color));
