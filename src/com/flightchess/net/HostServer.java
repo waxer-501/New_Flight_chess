@@ -17,7 +17,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import com.flightchess.core.AIController;
+import com.flightchess.core.GamePhase;
 import com.flightchess.core.GameState;
+import com.flightchess.core.Piece;
 import com.flightchess.core.Player;
 import com.flightchess.core.PlayerColor;
 import com.flightchess.core.PlayerState;
@@ -192,6 +194,9 @@ public class HostServer {
                     break;
                 case DEBUG_DICE:
                     handleDebugDice(msg);
+                    break;
+                case DEBUG_PHASE_TOGGLE:
+                    handleDebugPhase(msg);
                     break;
                 default:
                     break;
@@ -443,6 +448,7 @@ public class HostServer {
                 MoveResult result = ruleEngine.movePiece(gameState, actorColor, pieceIndex, pendingDiceResult);
                 pendingDiceResult = null;
                 pendingRollerId = null;
+                checkSuddenDeathTrigger();
                 if (!result.isExtraTurn()) {
                     rotateTurn();
                 }
@@ -514,10 +520,57 @@ public class HostServer {
         MoveResult result = ruleEngine.movePiece(gameState, color, pieceIndex, dice);
         pendingDiceResult = null;
         pendingRollerId = null;
+        checkSuddenDeathTrigger();
         if (!result.isExtraTurn()) {
             rotateTurn();
         }
         broadcast(new Message(MessageType.GAME_STATE_SNAPSHOT, roomId, aiPlayerId, 0L, gameState));
+    }
+
+    /** 检测所有棋子归巢的玩家并标记为死亡。
+     *  只有所有 4 架飞机都曾起飞过且当前全部归巢时，才判定死亡。 */
+    private void checkAndMarkDeadPlayers() {
+        if (gameState == null) return;
+        for (PlayerColor color : PlayerColor.ordered()) {
+            if (gameState.isPlayerDead(color)) continue;
+            Player player = gameState.getPlayer(color);
+            if (player == null) continue;
+            int launchedCount = 0;
+            int waitingCount = 0;
+            for (Piece piece : player.getPieces()) {
+                if (piece.hasEverLeftWaitingArea()) launchedCount++;
+                if (piece.isInWaitingArea()) waitingCount++;
+            }
+            if (launchedCount >= 4 && waitingCount >= 4) {
+                gameState.setPlayerDead(color, true);
+                System.out.println("玩家 " + color + " 已死亡");
+            }
+        }
+    }
+
+    /**
+     * 检查触发突然死亡模式的条件：
+     * - 场上存活玩家 ≤ 2
+     * - 或场上剩余非等待区棋子 ≤ 4
+     */
+    private void checkSuddenDeathTrigger() {
+        if (gameState == null) return;
+        checkAndMarkDeadPlayers();
+
+        if (gameState.getPhase() == GamePhase.SUDDEN_DEATH) return;
+
+        if (gameState.getAlivePlayerCount() <= 2 || gameState.getActivePieceCount() <= 4) {
+            gameState.setPhase(GamePhase.SUDDEN_DEATH);
+            System.out.println("=== 突然死亡模式开启 ===");
+        }
+    }
+
+    /** 调试：强制切换到突然死亡模式。 */
+    private void handleDebugPhase(Message msg) {
+        if (gameState == null) return;
+        gameState.setPhase(GamePhase.SUDDEN_DEATH);
+        System.out.println("=== 突然死亡模式开启 (调试) ===");
+        broadcast(new Message(MessageType.GAME_STATE_SNAPSHOT, roomId, msg.getPlayerId(), 0L, gameState));
     }
 
     private void rotateTurn() {

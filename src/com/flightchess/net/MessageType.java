@@ -33,6 +33,7 @@ public enum MessageType {
     HOST_MIGRATION_NOTICE,
 
     // 调试
-    DEBUG_DICE
+    DEBUG_DICE,
+    DEBUG_PHASE_TOGGLE
 }
 

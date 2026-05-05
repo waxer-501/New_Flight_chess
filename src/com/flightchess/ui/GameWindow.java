@@ -1,7 +1,9 @@
 package com.flightchess.ui;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.FlowLayout;
+import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
 
@@ -13,7 +15,9 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.KeyStroke;
+import javax.swing.SwingConstants;
 
+import com.flightchess.core.GamePhase;
 import com.flightchess.core.GameState;
 import com.flightchess.core.PlayerColor;
 
@@ -23,13 +27,14 @@ import com.flightchess.core.PlayerColor;
 public class GameWindow extends JFrame {
 
     /** 调试模式：改为 true 后可在对局中按 G 键直接指定骰子值。发布时置为 false。 */
-    private static final boolean DEBUG_MODE = false;
+    private static final boolean DEBUG_MODE = true;
 
     private final UiController controller;
     private final GameBoardPanel boardPanel = new GameBoardPanel();
 
     private final JLabel infoLabel = new JLabel("等待开始...");
     private final JButton rollDiceBtn = new JButton("掷骰");
+    private final JLabel suddenDeathBanner = new JLabel("突然死亡模式开启", SwingConstants.CENTER);
 
     public GameWindow(UiController controller) {
         super("Flight Chess - Game");
@@ -40,6 +45,13 @@ public class GameWindow extends JFrame {
     private void initUi() {
         setLayout(new BorderLayout());
         add(boardPanel, BorderLayout.CENTER);
+
+        suddenDeathBanner.setFont(new Font("微软雅黑", Font.BOLD, 26));
+        suddenDeathBanner.setForeground(new Color(0xC6, 0x28, 0x28));
+        suddenDeathBanner.setOpaque(true);
+        suddenDeathBanner.setBackground(new Color(0xFF, 0xEB, 0x3B));
+        suddenDeathBanner.setVisible(false);
+        add(suddenDeathBanner, BorderLayout.NORTH);
 
         // 从项目 docs 目录加载棋子图（透明背景 PNG）
         boardPanel.setPieceImage(PlayerColor.RED, "docs/chess_red.png");
@@ -75,6 +87,14 @@ public class GameWindow extends JFrame {
                     }
                 }
             });
+            getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
+                    .put(KeyStroke.getKeyStroke(KeyEvent.VK_H, 0, false), "debugPhase");
+            getRootPane().getActionMap().put("debugPhase", new AbstractAction() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    controller.debugTogglePhase();
+                }
+            });
         }
 
         pack();
@@ -84,6 +104,9 @@ public class GameWindow extends JFrame {
 
     public void setGameState(GameState state) {
         boardPanel.setGameState(state);
+        if (state != null && state.getPhase() == GamePhase.SUDDEN_DEATH) {
+            suddenDeathBanner.setVisible(true);
+        }
     }
 
     /** 设置最近一次掷骰结果及掷骰者，用于在可移动棋子上显示悬停黑圈。 */
