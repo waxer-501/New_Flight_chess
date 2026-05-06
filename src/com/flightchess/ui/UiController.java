@@ -125,14 +125,26 @@ public class UiController {
                 com.flightchess.core.PlayerColor turnColor = state.getCurrentTurn();
                 String turnPlayerName = getPlayerNameByColor(turnColor);
                 boolean turnIsLocal = (turnColor != null && turnColor == getMyColor());
-                final String turnHint = (turnPlayerName != null && !turnPlayerName.isEmpty())
-                        ? (turnIsLocal ? "轮到您投掷" : "轮到 " + turnPlayerName + " 投掷")
-                        : "等待投掷";
+                boolean stepMode = state.getPhase() == com.flightchess.core.GamePhase.SUDDEN_DEATH
+                        && turnIsLocal && state.getRemainingSteps() > 0;
+                final String turnHint;
+                if (stepMode) {
+                    turnHint = "← → 控制移动，剩余 " + state.getRemainingSteps() + " 步";
+                } else {
+                    turnHint = (turnPlayerName != null && !turnPlayerName.isEmpty())
+                            ? (turnIsLocal ? "轮到您投掷" : "轮到 " + turnPlayerName + " 投掷")
+                            : "等待投掷";
+                }
                 SwingUtilities.invokeLater(() -> {
                     gameWindow.setGameState(state);
                     gameWindow.setRollerIsLocal(false);
                     gameWindow.setInfoText(turnHint);
-                    gameWindow.setDiceEnabled(turnIsLocal);
+                    gameWindow.setDiceEnabled(turnIsLocal && !stepMode);
+                    if (stepMode) {
+                        gameWindow.enterStepControlMode();
+                    } else {
+                        gameWindow.exitStepControlMode();
+                    }
                 });
             }
         } else if (type == MessageType.DICE_ROLL_RESULT) {
@@ -205,6 +217,11 @@ public class UiController {
     /** 选择要移动的棋子并发送到服务器（掷骰后由用户点击棋子触发）。 */
     public void requestMove(int pieceIndex) {
         send(new Message(MessageType.MOVE_REQUEST, roomId, playerId, 0L, pieceIndex));
+    }
+
+    /** 突然死亡模式：发送单步步控方向，target = { cellTypeOrdinal, positionIndex }。 */
+    public void requestStepMove(int cellTypeOrdinal, int positionIndex) {
+        send(new Message(MessageType.STEP_MOVE, roomId, playerId, 0L, new int[]{ cellTypeOrdinal, positionIndex }));
     }
 
     private PlayerColor getMyColor() {

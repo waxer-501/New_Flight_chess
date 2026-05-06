@@ -33,6 +33,12 @@ public class GameState implements Serializable {
     /** 记录当前已死亡的玩家，用于触发双倍区与突然死亡模式。 */
     private final Map<PlayerColor, Boolean> deadPlayers = new EnumMap<>(PlayerColor.class);
 
+    /** 突然死亡模式下，当前回合剩余可移动步数（每步1格，=骰子点数）。 */
+    private int remainingSteps = 0;
+
+    /** 突然死亡模式下，当前正在步控的棋子索引（-1 表示未进入步控模式）。 */
+    private int selectedPieceIndex = -1;
+
     /** 对局唯一 ID，方便日志与重连校验。 */
     private final String gameId = UUID.randomUUID().toString();
 
@@ -47,6 +53,8 @@ public class GameState implements Serializable {
             deadPlayers.put(color, false);
         }
         currentTurn = PlayerColor.GREEN;
+        remainingSteps = 0;
+        selectedPieceIndex = -1;
     }
 
     public Map<PlayerColor, Player> getPlayers() {
@@ -89,6 +97,22 @@ public class GameState implements Serializable {
 
     public void setPlayerDead(PlayerColor color, boolean dead) {
         deadPlayers.put(color, dead);
+    }
+
+    public int getRemainingSteps() {
+        return remainingSteps;
+    }
+
+    public void setRemainingSteps(int n) {
+        this.remainingSteps = n;
+    }
+
+    public int getSelectedPieceIndex() {
+        return selectedPieceIndex;
+    }
+
+    public void setSelectedPieceIndex(int idx) {
+        this.selectedPieceIndex = idx;
     }
 
     public String getGameId() {

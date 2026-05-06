@@ -1,6 +1,7 @@
 package com.flightchess.core;
 
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -36,6 +37,20 @@ public final class BoardConfig {
     /** 起飞后第一步落在本方 1/4 段的第几格（0=起始格，3=起始格+3）。 */
     private static final int START_OFFSET_FROM_QUARTER = 3;
 
+    // ===================== 终点通道拓扑（突然死亡模式） =====================
+
+    /** 每方终点通道长度（格数）。 */
+    public static final int FINISH_LANE_LENGTH = 5;
+
+    /** 外圈路口索引 → 该路口通往的终点通道所属颜色。 */
+    private static final Map<Integer, PlayerColor> JUNCTION_MAP = new HashMap<>();
+
+    /** 每方终点通道所连接的外圈路口索引。 */
+    private static final Map<PlayerColor, Integer> JUNCTION_INDEX = new EnumMap<>(PlayerColor.class);
+
+    /** 中心格子数。 */
+    public static final int CENTER_COUNT = 4;
+
     static {
         // 每方 13 格区间：绿 0~12(下)，红 13~25(左上)，蓝 26~38(上)，黄 39~51(右下)
         QUARTER_START.put(PlayerColor.GREEN, 0);
@@ -62,6 +77,15 @@ public final class BoardConfig {
                 zone.add((start + i) % OUTER_CELL_COUNT);
             }
             DOUBLE_ZONE.put(color, zone);
+        }
+
+        // 终点通道路口：每方 quarter 起始格即路口（与描绘终点通道的 base 位置对齐）
+        JUNCTION_INDEX.put(PlayerColor.GREEN, 0);
+        JUNCTION_INDEX.put(PlayerColor.RED, 13);
+        JUNCTION_INDEX.put(PlayerColor.BLUE, 26);
+        JUNCTION_INDEX.put(PlayerColor.YELLOW, 39);
+        for (Map.Entry<PlayerColor, Integer> e : JUNCTION_INDEX.entrySet()) {
+            JUNCTION_MAP.put(e.getValue(), e.getKey());
         }
     }
 
@@ -115,6 +139,82 @@ public final class BoardConfig {
         return order[outerIndex % 4];
     }
 
+    // ===================== 终点通道 / 中心拓扑 =====================
+
+    /** 外圈索引是否为某个终点通道路口。 */
+    public static boolean isJunction(int outerIndex) {
+        return JUNCTION_MAP.containsKey(outerIndex);
+    }
+
+    /** 获取该外圈路口通往的终点通道颜色，非路口返回 null。 */
+    public static PlayerColor getJunctionColor(int outerIndex) {
+        return JUNCTION_MAP.get(outerIndex);
+    }
+
+    /** 获取某方终点通道所连接的外圈路口索引。 */
+    public static int getJunctionIndex(PlayerColor color) {
+        return JUNCTION_INDEX.getOrDefault(color, -1);
+    }
+
+    // ===================== CENTER_PATH 位置编码 =====================
+    // positionIndex = colorOrdinal * 5 + laneStep (0~4)
+    // GREEN=0~4, RED=5~9, BLUE=10~14, YELLOW=15~19
+
+    public static int encodeCenterPathPos(PlayerColor color, int laneStep) {
+        int colorOrd = colorToCenterIndex(color);
+        if (colorOrd < 0 || laneStep < 0 || laneStep >= FINISH_LANE_LENGTH) return -1;
+        return colorOrd * FINISH_LANE_LENGTH + laneStep;
+    }
+
+    public static PlayerColor decodeCenterPathColor(int pos) {
+        if (pos < 0 || pos >= CENTER_COUNT * FINISH_LANE_LENGTH) return null;
+        return centerIndexToColor(pos / FINISH_LANE_LENGTH);
+    }
+
+    public static int decodeCenterPathStep(int pos) {
+        if (pos < 0 || pos >= CENTER_COUNT * FINISH_LANE_LENGTH) return -1;
+        return pos % FINISH_LANE_LENGTH;
+    }
+
+    /** 获取某方终点通道中相邻更外层的格子索引（外=0, 内=4），超出范围返回 -1。 */
+    public static int getFinishLanePrev(PlayerColor color, int laneIndex) {
+        if (laneIndex <= 0 || laneIndex >= FINISH_LANE_LENGTH) return -1;
+        return laneIndex - 1;
+    }
+
+    /** 获取某方终点通道中相邻更内层的格子索引，超出范围返回 -1。 */
+    public static int getFinishLaneNext(PlayerColor color, int laneIndex) {
+        if (laneIndex < 0 || laneIndex >= FINISH_LANE_LENGTH - 1) return -1;
+        return laneIndex + 1;
+    }
+
+    /** 获取中心格顺时针下一格索引 (0=GREEN, 1=RED, 2=BLUE, 3=YELLOW)。 */
+    public static int getCenterNext(int centerIndex) {
+        return (centerIndex + 1) % CENTER_COUNT;
+    }
+
+    /** 获取中心格逆时针上一格索引。 */
+    public static int getCenterPrev(int centerIndex) {
+        return (centerIndex - 1 + CENTER_COUNT) % CENTER_COUNT;
+    }
+
+    /** 颜色 → 中心格索引 (GREEN=0, RED=1, BLUE=2, YELLOW=3)。 */
+    public static int colorToCenterIndex(PlayerColor color) {
+        PlayerColor[] order = PlayerColor.ordered();
+        for (int i = 0; i < order.length; i++) {
+            if (order[i] == color) return i;
+        }
+        return -1;
+    }
+
+    /** 中心格索引 → 颜色。 */
+    public static PlayerColor centerIndexToColor(int idx) {
+        PlayerColor[] order = PlayerColor.ordered();
+        if (idx >= 0 && idx < order.length) return order[idx];
+        return null;
+    }
+
+    /** 判断某外圈索引是否处于指定玩家的 1/4 段内。 */
     /**
      * 判断某外圈索引是否为航道入口（局部索引 7，即 BOTTOM_LEFT 三角形）。
      */

@@ -6,6 +6,7 @@ import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
+import java.util.List;
 
 import javax.swing.AbstractAction;
 import javax.swing.JButton;
@@ -35,6 +36,9 @@ public class GameWindow extends JFrame {
     private final JLabel infoLabel = new JLabel("等待开始...");
     private final JButton rollDiceBtn = new JButton("掷骰");
     private final JLabel suddenDeathBanner = new JLabel("突然死亡模式开启", SwingConstants.CENTER);
+
+    /** 是否处于步控模式（←→键控制棋子逐格移动）。 */
+    private boolean stepControlActive = false;
 
     public GameWindow(UiController controller) {
         super("Flight Chess - Game");
@@ -97,6 +101,8 @@ public class GameWindow extends JFrame {
             });
         }
 
+        setupStepControlKeys();
+
         pack();
         setResizable(false);
         setLocationRelativeTo(null);
@@ -126,5 +132,63 @@ public class GameWindow extends JFrame {
     public void setDiceEnabled(boolean enabled) {
         rollDiceBtn.setEnabled(enabled);
     }
-}
 
+    // ===== 突然死亡模式步控 =====
+
+    /** 进入步控模式：禁骰子按钮，绑定方向键，显示可走格子。 */
+    public void enterStepControlMode() {
+        stepControlActive = true;
+        rollDiceBtn.setEnabled(false);
+        boardPanel.setStepControlActive(true);
+    }
+
+    /** 退出步控模式。 */
+    public void exitStepControlMode() {
+        stepControlActive = false;
+        boardPanel.setStepControlActive(false);
+    }
+
+    /** 设置步控方向键绑定（在 initUi 中调用一次）。 */
+    private void setupStepControlKeys() {
+        getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
+                .put(KeyStroke.getKeyStroke(KeyEvent.VK_LEFT, 0, false), "stepLeft");
+        getRootPane().getActionMap().put("stepLeft", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (!stepControlActive) return;
+                int[] t = boardPanel.getAdjacentForKey(KeyEvent.VK_LEFT);
+                if (t != null) controller.requestStepMove(t[0], t[1]);
+            }
+        });
+        getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
+                .put(KeyStroke.getKeyStroke(KeyEvent.VK_RIGHT, 0, false), "stepRight");
+        getRootPane().getActionMap().put("stepRight", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (!stepControlActive) return;
+                int[] t = boardPanel.getAdjacentForKey(KeyEvent.VK_RIGHT);
+                if (t != null) controller.requestStepMove(t[0], t[1]);
+            }
+        });
+        getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
+                .put(KeyStroke.getKeyStroke(KeyEvent.VK_UP, 0, false), "stepUp");
+        getRootPane().getActionMap().put("stepUp", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (!stepControlActive) return;
+                int[] t = boardPanel.getAdjacentForKey(KeyEvent.VK_UP);
+                if (t != null) controller.requestStepMove(t[0], t[1]);
+            }
+        });
+        getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
+                .put(KeyStroke.getKeyStroke(KeyEvent.VK_DOWN, 0, false), "stepDown");
+        getRootPane().getActionMap().put("stepDown", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (!stepControlActive) return;
+                int[] t = boardPanel.getAdjacentForKey(KeyEvent.VK_DOWN);
+                if (t != null) controller.requestStepMove(t[0], t[1]);
+            }
+        });
+    }
+}

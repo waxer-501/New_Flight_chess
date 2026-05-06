@@ -22,6 +22,8 @@ public enum MessageType {
     DICE_ROLL_RESULT,
     MOVE_REQUEST,
     MOVE_RESULT,
+    /** 突然死亡模式：客户端发送单步移动方向，payload = int[]{ cellTypeOrdinal, positionIndex }。 */
+    STEP_MOVE,
     GAME_STATE_SNAPSHOT,
     GAME_OVER,
 
