@@ -363,6 +363,24 @@ public class HostServer {
             }
             gameState.setConsecutiveSixCount(actorColor, count);
 
+            // 连续两次 6 复活被吃棋子
+            if (count >= 2) {
+                boolean revived = ruleEngine.reviveDeadPieces(gameState, actorColor);
+                gameState.setConsecutiveSixCount(actorColor, 0);
+                if (revived) {
+                    // 复活消耗本次骰子，不可继续移动棋子
+                    broadcast(new Message(MessageType.DICE_ROLL_RESULT, roomId, msg.getPlayerId(), 0L, dice));
+                    synchronized (moveRequestLock) {
+                        if (dice != 6) {
+                            rotateTurn();
+                        }
+                        broadcast(new Message(MessageType.GAME_STATE_SNAPSHOT, roomId, msg.getPlayerId(), 0L, gameState));
+                        runAITurnIfNeeded();
+                    }
+                    return;
+                }
+            }
+
             pendingDiceResult = dice;
             pendingRollerId = msg.getPlayerId();
             broadcast(new Message(MessageType.DICE_ROLL_RESULT, roomId, msg.getPlayerId(), 0L, dice));
@@ -407,6 +425,24 @@ public class HostServer {
                 count = 0;
             }
             gameState.setConsecutiveSixCount(actorColor, count);
+
+            // 连续两次 6 复活被吃棋子
+            if (count >= 2) {
+                boolean revived = ruleEngine.reviveDeadPieces(gameState, actorColor);
+                gameState.setConsecutiveSixCount(actorColor, 0);
+                if (revived) {
+                    // 复活消耗本次骰子，不可继续移动棋子
+                    broadcast(new Message(MessageType.DICE_ROLL_RESULT, roomId, msg.getPlayerId(), 0L, dice));
+                    synchronized (moveRequestLock) {
+                        if (dice != 6) {
+                            rotateTurn();
+                        }
+                        broadcast(new Message(MessageType.GAME_STATE_SNAPSHOT, roomId, msg.getPlayerId(), 0L, gameState));
+                        runAITurnIfNeeded();
+                    }
+                    return;
+                }
+            }
 
             pendingDiceResult = dice;
             pendingRollerId = msg.getPlayerId();
@@ -506,6 +542,21 @@ public class HostServer {
             count = 0;
         }
         gameState.setConsecutiveSixCount(color, count);
+
+        // 连续两次 6 复活被吃棋子
+        if (count >= 2) {
+            boolean revived = ruleEngine.reviveDeadPieces(gameState, color);
+            gameState.setConsecutiveSixCount(color, 0);
+            if (revived) {
+                // 复活消耗本次骰子，不可继续移动棋子
+                broadcast(new Message(MessageType.DICE_ROLL_RESULT, roomId, aiPlayerId, 0L, dice));
+                if (dice != 6) {
+                    rotateTurn();
+                }
+                broadcast(new Message(MessageType.GAME_STATE_SNAPSHOT, roomId, aiPlayerId, 0L, gameState));
+                return;
+            }
+        }
 
         broadcast(new Message(MessageType.DICE_ROLL_RESULT, roomId, aiPlayerId, 0L, dice));
 

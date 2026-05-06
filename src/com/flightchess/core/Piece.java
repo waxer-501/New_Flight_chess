@@ -65,6 +65,10 @@ public class Piece implements Serializable {
         return cellType == CellType.TAKEOFF;
     }
 
+    public boolean isDead() {
+        return cellType == CellType.DEAD;
+    }
+
     public boolean hasEverLeftWaitingArea() {
         return hasEverLeftWaitingArea;
     }

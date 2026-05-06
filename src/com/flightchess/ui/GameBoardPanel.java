@@ -3,6 +3,7 @@ package com.flightchess.ui;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -14,7 +15,9 @@ import java.awt.event.MouseEvent;
 import java.awt.geom.Ellipse2D;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.IntConsumer;
@@ -325,9 +328,28 @@ public class GameBoardPanel extends JPanel {
         if (gameState == null) return;
         int size = (int) Math.max(16, cellLong * 0.45);
         List<Integer> movable = null;
-        if (lastDiceResult > 0 && lastDiceRollerColor != null && gameState.getCurrentTurn() == lastDiceRollerColor) {
+        if (lastDiceResult > 0 && lastDiceRollerColor != null
+                && gameState.getCurrentTurn() == lastDiceRollerColor) {
             movable = ruleEngine.listMovablePieces(gameState, lastDiceRollerColor, lastDiceResult);
         }
+
+        // Collect positions of OUTER/TAKEOFF pieces to detect stacks.
+        // key = "color_cellType_positionIndex", value = list of slot indices at that position.
+        Map<String, List<Integer>> posSlots = new HashMap<>();
+        for (PlayerColor color : PlayerColor.ordered()) {
+            Player player = gameState.getPlayer(color);
+            if (player == null) continue;
+            int slot = 0;
+            for (Piece piece : player.getPieces()) {
+                CellType ct = piece.getCellType();
+                if (ct == CellType.OUTER || ct == CellType.TAKEOFF) {
+                    String key = color.name() + "_" + ct.name() + "_" + piece.getPositionIndex();
+                    posSlots.computeIfAbsent(key, k -> new ArrayList<>()).add(slot);
+                }
+                slot++;
+            }
+        }
+
         for (PlayerColor color : PlayerColor.ordered()) {
             Image img = pieceImages.get(color);
             if (img == null) continue;
@@ -336,8 +358,10 @@ public class GameBoardPanel extends JPanel {
             int slot = 0;
             for (Piece piece : player.getPieces()) {
                 int[] xy;
+                boolean isWaiting = false;
                 if (piece.getCellType() == CellType.WAITING_AREA) {
                     xy = birthPointSlotToPixel(colorToBirthIndex(color), slot);
+                    isWaiting = true;
                 } else if (piece.getCellType() == CellType.TAKEOFF) {
                     xy = takeoffIndexToPixel(piece.getPositionIndex());
                 } else if (piece.getCellType() == CellType.OUTER) {
@@ -347,13 +371,46 @@ public class GameBoardPanel extends JPanel {
                     continue;
                 }
                 int x = xy[0] - size / 2, y = xy[1] - size / 2;
-                Shape oldClip = g2.getClip();
-                g2.setClip(new Ellipse2D.Double(x, y, size, size));
-                g2.drawImage(img, x, y, size, size, null);
-                g2.setClip(oldClip);
-                boolean isMovable = movable != null && color == lastDiceRollerColor && movable.contains(slot);
-                boolean isHovered = hoverX >= x && hoverX < x + size && hoverY >= y && hoverY < y + size;
-                if (isMovable && isHovered) {
+
+                // For stackable positions, only draw the image for the first piece in the stack.
+                String key = color.name() + "_" + piece.getCellType().name() + "_" + piece.getPositionIndex();
+                List<Integer> allSlots = posSlots.get(key);
+                int stackCount = (allSlots != null) ? allSlots.size() : 1;
+                boolean isFirstInStack = (allSlots == null) || (allSlots.get(0) == slot);
+
+                boolean shouldDrawImage = isWaiting || isFirstInStack;
+                if (shouldDrawImage) {
+                    Shape oldClip = g2.getClip();
+                    g2.setClip(new Ellipse2D.Double(x, y, size, size));
+                    g2.drawImage(img, x, y, size, size, null);
+                    g2.setClip(oldClip);
+
+                    if (stackCount > 1) {
+                        g2.setFont(getFont().deriveFont(Font.BOLD, size * 0.5f));
+                        String label = "x" + stackCount;
+                        FontMetrics fm = g2.getFontMetrics();
+                        int labelW = fm.stringWidth(label);
+                        int labelX = x + size - labelW / 2;
+                        int labelY = y + fm.getAscent() / 3;
+                        g2.setColor(new Color(0, 0, 0, 180));
+                        g2.drawString(label, labelX + 1, labelY + 1);
+                        g2.setColor(Color.WHITE);
+                        g2.drawString(label, labelX, labelY);
+                    }
+                }
+
+                // Hover highlight: for stacks, check if any slot in the stack is movable.
+                boolean isAnyMovable;
+                if (allSlots != null && allSlots.size() > 1) {
+                    isAnyMovable = movable != null && color == lastDiceRollerColor
+                        && allSlots.stream().anyMatch(movable::contains);
+                } else {
+                    isAnyMovable = movable != null && color == lastDiceRollerColor
+                        && movable.contains(slot);
+                }
+                boolean isHovered = hoverX >= x && hoverX < x + size
+                                    && hoverY >= y && hoverY < y + size;
+                if (isAnyMovable && isHovered && shouldDrawImage) {
                     g2.setColor(Color.BLACK);
                     g2.setStroke(new BasicStroke(2.5f));
                     int r = size / 2 + 3;

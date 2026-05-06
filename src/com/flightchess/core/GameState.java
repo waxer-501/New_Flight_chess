@@ -116,7 +116,7 @@ public class GameState implements Serializable {
         int total = 0;
         for (Player player : players.values()) {
             for (Piece piece : player.getPieces()) {
-                if (!piece.isInWaitingArea()) {
+                if (!piece.isInWaitingArea() && !piece.isDead()) {
                     total++;
                 }
             }

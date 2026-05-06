@@ -52,7 +52,9 @@ public class RuleEngine {
         if (state.isPlayerDead(color)) {
             return false;
         }
-
+        if (piece.isDead()) {
+            return false;
+        }
         if (piece.isInWaitingArea()) {
             return dice == 6;
         }
@@ -103,7 +105,7 @@ public class RuleEngine {
             if (!capturedPieces.isEmpty()) {
                 captured = true;
                 for (Piece enemy : capturedPieces) {
-                    enemy.setCellType(CellType.WAITING_AREA);
+                    enemy.setCellType(CellType.DEAD);
                     enemy.setPositionIndex(-1);
                 }
             }
@@ -115,7 +117,7 @@ public class RuleEngine {
                 if (!airCaptured.isEmpty()) {
                     captured = true;
                     for (Piece enemy : airCaptured) {
-                        enemy.setCellType(CellType.WAITING_AREA);
+                        enemy.setCellType(CellType.DEAD);
                         enemy.setPositionIndex(-1);
                     }
                 }
@@ -128,7 +130,7 @@ public class RuleEngine {
                 if (!jumpCaptured.isEmpty()) {
                     captured = true;
                     for (Piece enemy : jumpCaptured) {
-                        enemy.setCellType(CellType.WAITING_AREA);
+                        enemy.setCellType(CellType.DEAD);
                         enemy.setPositionIndex(-1);
                     }
                 }
@@ -146,7 +148,7 @@ public class RuleEngine {
             if (!capturedPieces.isEmpty()) {
                 captured = true;
                 for (Piece enemy : capturedPieces) {
-                    enemy.setCellType(CellType.WAITING_AREA);
+                    enemy.setCellType(CellType.DEAD);
                     enemy.setPositionIndex(-1);
                 }
             }
@@ -158,7 +160,7 @@ public class RuleEngine {
                 if (!airCaptured.isEmpty()) {
                     captured = true;
                     for (Piece enemy : airCaptured) {
-                        enemy.setCellType(CellType.WAITING_AREA);
+                        enemy.setCellType(CellType.DEAD);
                         enemy.setPositionIndex(-1);
                     }
                 }
@@ -171,7 +173,7 @@ public class RuleEngine {
                 if (!jumpCaptured.isEmpty()) {
                     captured = true;
                     for (Piece enemy : jumpCaptured) {
-                        enemy.setCellType(CellType.WAITING_AREA);
+                        enemy.setCellType(CellType.DEAD);
                         enemy.setPositionIndex(-1);
                     }
                 }
@@ -233,6 +235,28 @@ public class RuleEngine {
             }
         }
         return result;
+    }
+
+    /**
+     * 复活玩家所有被吃掉的棋子：将其从隐藏状态移动到起飞格。
+     * 若玩家没有隐藏棋子，调用无效果。
+     *
+     * @return 是否有棋子被复活
+     */
+    public boolean reviveDeadPieces(GameState state, PlayerColor color) {
+        Player player = state.getPlayer(color);
+        if (player == null) return false;
+
+        int takeoffIndex = BoardConfig.getTakeoffIndex(color);
+        boolean revived = false;
+        for (Piece piece : player.getPieces()) {
+            if (piece.isDead()) {
+                piece.setCellType(CellType.TAKEOFF);
+                piece.setPositionIndex(takeoffIndex);
+                revived = true;
+            }
+        }
+        return revived;
     }
 
     /**
