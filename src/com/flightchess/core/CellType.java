@@ -10,6 +10,7 @@ public enum CellType {
     AIR_ROUTE,      // 航道格（飞行路径）
     CENTER_PATH,    // 通向中心的纯色路径
     CENTER,         // 中心四格
-    WAITING_AREA    // 等待复活区（逻辑区域，不一定是真实格子）
+    WAITING_AREA,   // 等待区（初始未起飞棋子）
+    DEAD            // 被吃后隐藏，等待连续两次 6 复活
 }
 
