@@ -439,6 +439,10 @@ public class GameBoardPanel extends JPanel {
                     xy = takeoffIndexToPixel(piece.getPositionIndex());
                 } else if (piece.getCellType() == CellType.OUTER) {
                     xy = outerIndexToPixel(piece.getPositionIndex(), 0, 0, 0, 0);
+                } else if (piece.getCellType() == CellType.CENTER_PATH) {
+                    xy = stepTargetPixel(CellType.CENTER_PATH.ordinal(), piece.getPositionIndex());
+                } else if (piece.getCellType() == CellType.CENTER) {
+                    xy = stepTargetPixel(CellType.CENTER.ordinal(), piece.getPositionIndex());
                 } else {
                     slot++;
                     continue;
