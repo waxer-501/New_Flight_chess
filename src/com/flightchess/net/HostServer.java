@@ -62,6 +62,10 @@ public class HostServer {
     /** 突然死亡模式下记录原始骰子值（用于步数用完后的额外回合判定）。 */
     private volatile int suddenDeathOriginalDice = 0;
 
+    /** 双骰模式：暂存两颗骰子值（用于两阶段协议）。 */
+    private volatile int pendingDualDice1 = 0;
+    private volatile int pendingDualDice2 = 0;
+
     private volatile boolean running = false;
 
     public HostServer(int port) {
@@ -611,13 +615,10 @@ public class HostServer {
 
         int dice;
         if (gameState.getPhase() == GamePhase.SUDDEN_DEATH) {
-            // 突然死亡模式：AI 随机选双骰模式
-            int choice = ruleEngine.rollDice() % 2 + 1; // 1 或 2
-            if (choice == 1) {
-                dice = ruleEngine.rollDice() * 2;
-            } else {
-                dice = ruleEngine.rollDice() + ruleEngine.rollDice();
-            }
+            // 突然死亡模式：掷两颗骰子，自动选最优用法
+            int d1 = ruleEngine.rollDice();
+            int d2 = ruleEngine.rollDice();
+            dice = Math.max(Math.max(d1 * 2, d2 * 2), d1 + d2);
         } else {
             dice = ruleEngine.rollDice();
         }
@@ -704,36 +705,56 @@ public class HostServer {
         }
     }
 
-    /** 突然死亡模式双骰：choice=1（单骰×2）或 choice=2（双骰相加）。 */
+    /** 突然死亡模式双骰：两阶段协议。
+     *  阶段1：payload == null → 掷两颗骰子，向当前玩家发送 DUAL_DICE_RESULT。
+     *  阶段2：payload = Integer → 选择使用方式(1=dice1×2, 2=dice2×2, 3=dice1+dice2)。 */
     private void handleDualDiceRoll(Message msg) {
         if (gameState == null || gameState.getPhase() != GamePhase.SUDDEN_DEATH) return;
         PlayerColor actorColor = playerColors.get(msg.getPlayerId());
         if (actorColor == null) return;
         if (gameState.getCurrentTurn() != actorColor) return;
-        Object payload = msg.getPayload();
-        if (!(payload instanceof Integer)) return;
-        int choice = (Integer) payload;
-        if (choice != 1 && choice != 2) return;
 
-        int dice;
-        if (choice == 1) {
-            dice = ruleEngine.rollDice() * 2;
-        } else {
-            dice = ruleEngine.rollDice() + ruleEngine.rollDice();
+        Object payload = msg.getPayload();
+
+        // 阶段1：发起到开始掷骰
+        if (payload == null) {
+            int dice1 = ruleEngine.rollDice();
+            int dice2 = ruleEngine.rollDice();
+            pendingDualDice1 = dice1;
+            pendingDualDice2 = dice2;
+            broadcast(new Message(MessageType.DUAL_DICE_RESULT, roomId, msg.getPlayerId(), 0L,
+                    new int[]{dice1, dice2}));
+            return;
         }
 
-        pendingDiceResult = dice;
-        pendingRollerId = msg.getPlayerId();
-        broadcast(new Message(MessageType.DICE_ROLL_RESULT, roomId, msg.getPlayerId(), 0L, dice));
+        // 阶段2：用户选择使用方式
+        if (payload instanceof Integer) {
+            if (pendingDualDice1 == 0 && pendingDualDice2 == 0) return;
+            int choice = (Integer) payload;
+            if (choice < 1 || choice > 3) return;
+            int dice;
+            switch (choice) {
+                case 1: dice = pendingDualDice1 * 2; break;
+                case 2: dice = pendingDualDice2 * 2; break;
+                case 3: dice = pendingDualDice1 + pendingDualDice2; break;
+                default: return;
+            }
+            pendingDualDice1 = 0;
+            pendingDualDice2 = 0;
 
-        List<Integer> movable = ruleEngine.listMovablePieces(gameState, actorColor, dice);
-        if (movable.isEmpty()) {
-            synchronized (moveRequestLock) {
-                pendingDiceResult = null;
-                pendingRollerId = null;
-                rotateTurn();
-                broadcast(new Message(MessageType.GAME_STATE_SNAPSHOT, roomId, msg.getPlayerId(), 0L, gameState));
-                runAITurnIfNeeded();
+            pendingDiceResult = dice;
+            pendingRollerId = msg.getPlayerId();
+            broadcast(new Message(MessageType.DICE_ROLL_RESULT, roomId, msg.getPlayerId(), 0L, dice));
+
+            List<Integer> movable = ruleEngine.listMovablePieces(gameState, actorColor, dice);
+            if (movable.isEmpty()) {
+                synchronized (moveRequestLock) {
+                    pendingDiceResult = null;
+                    pendingRollerId = null;
+                    rotateTurn();
+                    broadcast(new Message(MessageType.GAME_STATE_SNAPSHOT, roomId, msg.getPlayerId(), 0L, gameState));
+                    runAITurnIfNeeded();
+                }
             }
         }
     }
@@ -750,10 +771,12 @@ public class HostServer {
         if (gameState == null || roomInfo == null) {
             return;
         }
-        // 转回合时清理步控状态
+        // 转回合时清理步控与双骰状态
         gameState.setRemainingSteps(0);
         gameState.setSelectedPieceIndex(-1);
         suddenDeathOriginalDice = 0;
+        pendingDualDice1 = 0;
+        pendingDualDice2 = 0;
         PlayerColor current = gameState.getCurrentTurn();
         PlayerColor[] order = PlayerColor.ordered();
         int idx = 0;
