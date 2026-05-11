@@ -373,6 +373,43 @@ public class RuleEngine {
     }
 
     /**
+     * 检查第四家补偿条件是否满足：
+     * 其他三家都已至少起飞一架飞机，且本家尚未有任何飞机起飞。
+     * 满足时，第四家每次掷骰后可额外摇一次直到摇到 6。
+     */
+    public boolean isFourthPlayerCompensationActive(GameState state, PlayerColor color) {
+        Player player = state.getPlayer(color);
+        if (player == null) return false;
+
+        // 本家是否已起飞
+        boolean selfLaunched = false;
+        for (Piece piece : player.getPieces()) {
+            if (piece.hasEverLeftWaitingArea()) {
+                selfLaunched = true;
+                break;
+            }
+        }
+        if (selfLaunched) return false;
+
+        // 检查其他三家是否都已起飞
+        for (PlayerColor other : PlayerColor.ordered()) {
+            if (other == color) continue;
+            Player p = state.getPlayer(other);
+            if (p == null) return false;
+            boolean launched = false;
+            for (Piece piece : p.getPieces()) {
+                if (piece.hasEverLeftWaitingArea()) {
+                    launched = true;
+                    break;
+                }
+            }
+            if (!launched) return false;
+        }
+
+        return true;
+    }
+
+    /**
      * 简单结果封装，便于 UI / 网络层使用。
      */
     public static class MoveResult {
