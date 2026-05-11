@@ -175,8 +175,19 @@ public class UiController {
                     gameWindow.setLastDiceResult(dice, color);
                     gameWindow.setRollerIsLocal(rollerIsLocal);
                     if (rollerIsLocal) {
-                        gameWindow.setDiceEnabled(false); // 已掷骰，等选子完成后再恢复
+                        gameWindow.setDiceEnabled(false);
                     }
+                });
+            }
+        } else if (type == MessageType.DUAL_DICE_RESULT) {
+            Object payload = msg.getPayload();
+            if (payload instanceof int[] && ((int[]) payload).length == 2 && gameWindow != null) {
+                int[] dice = (int[]) payload;
+                final String rollerName = getPlayerNameByColor(getMyColor());
+                SwingUtilities.invokeLater(() -> {
+                    gameWindow.showDualDiceResult(dice[0], dice[1]);
+                    gameWindow.setInfoText(rollerName + " 掷出 " + dice[0] + " 和 " + dice[1] + " — 选择使用方式");
+                    gameWindow.setLastDiceResult(dice[0], getMyColor());
                 });
             }
         }
@@ -214,9 +225,14 @@ public class UiController {
         send(new Message(MessageType.DICE_ROLL_REQUEST, roomId, playerId, 0L, null));
     }
 
-    /** 突然死亡模式：发送双骰掷骰请求，mode=1（单骰×2）或 mode=2（双骰相加）。 */
-    public void requestDualDiceRoll(int mode) {
-        send(new Message(MessageType.DUAL_DICE_ROLL, roomId, playerId, 0L, mode));
+    /** 突然死亡模式：发起双骰掷骰（先看两颗骰子值）。 */
+    public void requestDualDiceRoll() {
+        send(new Message(MessageType.DUAL_DICE_ROLL, roomId, playerId, 0L, null));
+    }
+
+    /** 看到两颗骰子后选择使用方式：1=dice1×2, 2=dice2×2, 3=相加。 */
+    public void requestDualDiceChoose(int choice) {
+        send(new Message(MessageType.DUAL_DICE_ROLL, roomId, playerId, 0L, choice));
     }
 
     /** 选择要移动的棋子并发送到服务器（掷骰后由用户点击棋子触发）。 */

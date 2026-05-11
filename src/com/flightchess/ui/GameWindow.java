@@ -36,8 +36,11 @@ public class GameWindow extends JFrame {
     private final JLabel infoLabel = new JLabel("等待开始...");
     private final JButton rollDiceBtn = new JButton("掷骰");
     /** 突然死亡模式双骰按钮。 */
-    private final JButton singleDoubleBtn = new JButton("单骰×2");
-    private final JButton doubleSumBtn = new JButton("双骰相加");
+    private final JButton dualDiceRollBtn = new JButton("双骰");
+    /** 看到两颗骰子后选择使用方式。 */
+    private final JButton diceA2xBtn = new JButton("×2");
+    private final JButton diceB2xBtn = new JButton("×2");
+    private final JButton diceSumBtn = new JButton("相加");
     private final JLabel suddenDeathBanner = new JLabel("突然死亡模式开启", SwingConstants.CENTER);
 
     /** 是否处于步控模式（←→键控制棋子逐格移动）。 */
@@ -70,13 +73,17 @@ public class GameWindow extends JFrame {
         JPanel bottom = new JPanel(new FlowLayout());
         bottom.add(infoLabel);
         bottom.add(rollDiceBtn);
-        bottom.add(singleDoubleBtn);
-        bottom.add(doubleSumBtn);
+        bottom.add(dualDiceRollBtn);
+        bottom.add(diceA2xBtn);
+        bottom.add(diceB2xBtn);
+        bottom.add(diceSumBtn);
         add(bottom, BorderLayout.SOUTH);
 
         rollDiceBtn.addActionListener((ActionEvent e) -> controller.requestDiceRoll());
-        singleDoubleBtn.addActionListener((ActionEvent e) -> controller.requestDualDiceRoll(1));
-        doubleSumBtn.addActionListener((ActionEvent e) -> controller.requestDualDiceRoll(2));
+        dualDiceRollBtn.addActionListener((ActionEvent e) -> controller.requestDualDiceRoll());
+        diceA2xBtn.addActionListener((ActionEvent e) -> controller.requestDualDiceChoose(1));
+        diceB2xBtn.addActionListener((ActionEvent e) -> controller.requestDualDiceChoose(2));
+        diceSumBtn.addActionListener((ActionEvent e) -> controller.requestDualDiceChoose(3));
 
         // 调试功能：按 G 键弹出骰子输入框（仅 DEBUG_MODE=true 时启用）
         if (DEBUG_MODE) {
@@ -129,8 +136,25 @@ public class GameWindow extends JFrame {
     /** 切换正常掷骰与双骰按钮显隐。 */
     private void showDualDiceButtons(boolean dual) {
         rollDiceBtn.setVisible(!dual);
-        singleDoubleBtn.setVisible(dual);
-        doubleSumBtn.setVisible(dual);
+        dualDiceRollBtn.setVisible(dual);
+        // 选择按钮默认隐藏，掷出骰子后再显示
+        diceA2xBtn.setVisible(false);
+        diceB2xBtn.setVisible(false);
+        diceSumBtn.setVisible(false);
+    }
+
+    /** 显示双骰结果并提供三个选择按钮。 */
+    public void showDualDiceResult(int dice1, int dice2) {
+        dualDiceRollBtn.setVisible(false);
+        diceA2xBtn.setText("骰A " + dice1 + " ×2 = " + (dice1 * 2));
+        diceB2xBtn.setText("骰B " + dice2 + " ×2 = " + (dice2 * 2));
+        diceSumBtn.setText("相加 " + dice1 + "+" + dice2 + " = " + (dice1 + dice2));
+        diceA2xBtn.setVisible(true);
+        diceB2xBtn.setVisible(true);
+        diceSumBtn.setVisible(true);
+        diceA2xBtn.setEnabled(true);
+        diceB2xBtn.setEnabled(true);
+        diceSumBtn.setEnabled(true);
     }
 
     /** 设置最近一次掷骰结果及掷骰者，用于在可移动棋子上显示悬停黑圈。 */
@@ -149,8 +173,8 @@ public class GameWindow extends JFrame {
 
     public void setDiceEnabled(boolean enabled) {
         rollDiceBtn.setEnabled(enabled);
-        singleDoubleBtn.setEnabled(enabled);
-        doubleSumBtn.setEnabled(enabled);
+        dualDiceRollBtn.setEnabled(enabled);
+        // 选择按钮不在这里控制，由 showDualDiceResult 管理
     }
 
     // ===== 突然死亡模式步控 =====
@@ -159,8 +183,10 @@ public class GameWindow extends JFrame {
     public void enterStepControlMode() {
         stepControlActive = true;
         rollDiceBtn.setEnabled(false);
-        singleDoubleBtn.setEnabled(false);
-        doubleSumBtn.setEnabled(false);
+        dualDiceRollBtn.setEnabled(false);
+        diceA2xBtn.setEnabled(false);
+        diceB2xBtn.setEnabled(false);
+        diceSumBtn.setEnabled(false);
         boardPanel.setStepControlActive(true);
     }
 

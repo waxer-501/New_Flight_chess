@@ -24,8 +24,10 @@ public enum MessageType {
     MOVE_RESULT,
     /** 突然死亡模式：客户端发送单步移动方向，payload = int[]{ cellTypeOrdinal, positionIndex }。 */
     STEP_MOVE,
-    /** 突然死亡模式双骰：payload = Integer (1=单骰×2, 2=双骰相加)。 */
+    /** 突然死亡模式双骰：payload = null 发起掷骰 / Integer 选择使用方式(1=dice1×2, 2=dice2×2, 3=相加)。 */
     DUAL_DICE_ROLL,
+    /** 突然死亡模式双骰结果：payload = int[]{ dice1, dice2 }。 */
+    DUAL_DICE_RESULT,
     GAME_STATE_SNAPSHOT,
     GAME_OVER,
 
