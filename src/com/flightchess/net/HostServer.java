@@ -195,6 +195,9 @@ public class HostServer {
                 case STEP_MOVE:
                     handleStepMove(msg);
                     break;
+                case DUAL_DICE_ROLL:
+                    handleDualDiceRoll(msg);
+                    break;
                 case PING:
                     break;
                 case COLOR_SELECT:
@@ -495,8 +498,8 @@ public class HostServer {
                     // 突然死亡模式：进入步控模式，不自动走完骰子步数
                     Piece piece = gameState.getPlayer(actorColor).getPieces().get(pieceIndex);
                     if (piece.isInWaitingArea()) {
-                        // 掷 6 起飞：移到起飞格
-                        if (dice == 6) {
+                        // 掷 6（或双骰 ≥6）起飞：移到起飞格
+                        if (dice >= 6) {
                             piece.setCellType(CellType.TAKEOFF);
                             piece.setPositionIndex(BoardConfig.getTakeoffIndex(actorColor));
                             piece.setHasEverLeftWaitingArea(true);
@@ -606,27 +609,40 @@ public class HostServer {
         PlayerColor color = gameState.getCurrentTurn();
         String aiPlayerId = "AI-" + color.name();
 
-        int dice = ruleEngine.rollDice();
-        int count = gameState.getConsecutiveSixCount(color);
-        if (dice == 6) {
-            count++;
+        int dice;
+        if (gameState.getPhase() == GamePhase.SUDDEN_DEATH) {
+            // 突然死亡模式：AI 随机选双骰模式
+            int choice = ruleEngine.rollDice() % 2 + 1; // 1 或 2
+            if (choice == 1) {
+                dice = ruleEngine.rollDice() * 2;
+            } else {
+                dice = ruleEngine.rollDice() + ruleEngine.rollDice();
+            }
         } else {
-            count = 0;
+            dice = ruleEngine.rollDice();
         }
-        gameState.setConsecutiveSixCount(color, count);
 
-        // 连续两次 6 复活被吃棋子
-        if (count >= 2) {
-            boolean revived = ruleEngine.reviveDeadPieces(gameState, color);
-            gameState.setConsecutiveSixCount(color, 0);
-            if (revived) {
-                // 复活消耗本次骰子，不可继续移动棋子
-                broadcast(new Message(MessageType.DICE_ROLL_RESULT, roomId, aiPlayerId, 0L, dice));
-                if (dice != 6) {
-                    rotateTurn();
+        // 正常模式才有连续两次 6 复活逻辑
+        if (gameState.getPhase() != GamePhase.SUDDEN_DEATH) {
+            int count = gameState.getConsecutiveSixCount(color);
+            if (dice == 6) {
+                count++;
+            } else {
+                count = 0;
+            }
+            gameState.setConsecutiveSixCount(color, count);
+
+            if (count >= 2) {
+                boolean revived = ruleEngine.reviveDeadPieces(gameState, color);
+                gameState.setConsecutiveSixCount(color, 0);
+                if (revived) {
+                    broadcast(new Message(MessageType.DICE_ROLL_RESULT, roomId, aiPlayerId, 0L, dice));
+                    if (dice != 6) {
+                        rotateTurn();
+                    }
+                    broadcast(new Message(MessageType.GAME_STATE_SNAPSHOT, roomId, aiPlayerId, 0L, gameState));
+                    return;
                 }
-                broadcast(new Message(MessageType.GAME_STATE_SNAPSHOT, roomId, aiPlayerId, 0L, gameState));
-                return;
             }
         }
 
@@ -685,6 +701,40 @@ public class HostServer {
         if (gameState.getAlivePlayerCount() <= 2 || gameState.getActivePieceCount() <= 4) {
             gameState.setPhase(GamePhase.SUDDEN_DEATH);
             System.out.println("=== 突然死亡模式开启 ===");
+        }
+    }
+
+    /** 突然死亡模式双骰：choice=1（单骰×2）或 choice=2（双骰相加）。 */
+    private void handleDualDiceRoll(Message msg) {
+        if (gameState == null || gameState.getPhase() != GamePhase.SUDDEN_DEATH) return;
+        PlayerColor actorColor = playerColors.get(msg.getPlayerId());
+        if (actorColor == null) return;
+        if (gameState.getCurrentTurn() != actorColor) return;
+        Object payload = msg.getPayload();
+        if (!(payload instanceof Integer)) return;
+        int choice = (Integer) payload;
+        if (choice != 1 && choice != 2) return;
+
+        int dice;
+        if (choice == 1) {
+            dice = ruleEngine.rollDice() * 2;
+        } else {
+            dice = ruleEngine.rollDice() + ruleEngine.rollDice();
+        }
+
+        pendingDiceResult = dice;
+        pendingRollerId = msg.getPlayerId();
+        broadcast(new Message(MessageType.DICE_ROLL_RESULT, roomId, msg.getPlayerId(), 0L, dice));
+
+        List<Integer> movable = ruleEngine.listMovablePieces(gameState, actorColor, dice);
+        if (movable.isEmpty()) {
+            synchronized (moveRequestLock) {
+                pendingDiceResult = null;
+                pendingRollerId = null;
+                rotateTurn();
+                broadcast(new Message(MessageType.GAME_STATE_SNAPSHOT, roomId, msg.getPlayerId(), 0L, gameState));
+                runAITurnIfNeeded();
+            }
         }
     }
 

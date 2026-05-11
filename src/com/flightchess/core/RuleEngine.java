@@ -56,7 +56,7 @@ public class RuleEngine {
             return false;
         }
         if (piece.isInWaitingArea()) {
-            return dice == 6;
+            return dice >= 6; // >=6 以支持突然死亡模式双骰（可能得到 8/10/12）
         }
         if (piece.isInTakeoffArea()) {
             return dice >= 1 && dice <= 6;
