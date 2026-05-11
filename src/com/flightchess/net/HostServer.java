@@ -62,6 +62,9 @@ public class HostServer {
     /** 突然死亡模式下记录原始骰子值（用于步数用完后的额外回合判定）。 */
     private volatile int suddenDeathOriginalDice = 0;
 
+    /** 第四家补偿：本回合是否已使用过额外掷骰机会（最多一次）。 */
+    private volatile boolean compensationUsedThisTurn = false;
+
     private volatile boolean running = false;
 
     public HostServer(int port) {
@@ -399,6 +402,12 @@ public class HostServer {
                 synchronized (moveRequestLock) {
                     pendingDiceResult = null;
                     pendingRollerId = null;
+                    // 第四家补偿：若其他三家都已出飞机且本家未起飞，额外摇一次
+                    if (!compensationUsedThisTurn && ruleEngine.isFourthPlayerCompensationActive(gameState, actorColor)) {
+                        compensationUsedThisTurn = true;
+                        broadcast(new Message(MessageType.GAME_STATE_SNAPSHOT, roomId, msg.getPlayerId(), 0L, gameState));
+                        return;
+                    }
                     rotateTurn();
                     broadcast(new Message(MessageType.GAME_STATE_SNAPSHOT, roomId, msg.getPlayerId(), 0L, gameState));
                     runAITurnIfNeeded();
@@ -461,6 +470,12 @@ public class HostServer {
                 synchronized (moveRequestLock) {
                     pendingDiceResult = null;
                     pendingRollerId = null;
+                    // 第四家补偿：若其他三家都已出飞机且本家未起飞，额外摇一次
+                    if (!compensationUsedThisTurn && ruleEngine.isFourthPlayerCompensationActive(gameState, actorColor)) {
+                        compensationUsedThisTurn = true;
+                        broadcast(new Message(MessageType.GAME_STATE_SNAPSHOT, roomId, msg.getPlayerId(), 0L, gameState));
+                        return;
+                    }
                     rotateTurn();
                     broadcast(new Message(MessageType.GAME_STATE_SNAPSHOT, roomId, msg.getPlayerId(), 0L, gameState));
                     runAITurnIfNeeded();
@@ -636,6 +651,12 @@ public class HostServer {
         if (pieceIndex < 0) {
             pendingDiceResult = null;
             pendingRollerId = null;
+            // 第四家补偿：AI 也享受
+            if (!compensationUsedThisTurn && ruleEngine.isFourthPlayerCompensationActive(gameState, color)) {
+                compensationUsedThisTurn = true;
+                broadcast(new Message(MessageType.GAME_STATE_SNAPSHOT, roomId, aiPlayerId, 0L, gameState));
+                return;
+            }
             rotateTurn();
             broadcast(new Message(MessageType.GAME_STATE_SNAPSHOT, roomId, aiPlayerId, 0L, gameState));
             return;
@@ -700,10 +721,11 @@ public class HostServer {
         if (gameState == null || roomInfo == null) {
             return;
         }
-        // 转回合时清理步控状态
+        // 转回合时清理步控状态与第四家补偿标记
         gameState.setRemainingSteps(0);
         gameState.setSelectedPieceIndex(-1);
         suddenDeathOriginalDice = 0;
+        compensationUsedThisTurn = false;
         PlayerColor current = gameState.getCurrentTurn();
         PlayerColor[] order = PlayerColor.ordered();
         int idx = 0;
