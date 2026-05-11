@@ -35,6 +35,9 @@ public class GameWindow extends JFrame {
 
     private final JLabel infoLabel = new JLabel("等待开始...");
     private final JButton rollDiceBtn = new JButton("掷骰");
+    /** 突然死亡模式双骰按钮。 */
+    private final JButton singleDoubleBtn = new JButton("单骰×2");
+    private final JButton doubleSumBtn = new JButton("双骰相加");
     private final JLabel suddenDeathBanner = new JLabel("突然死亡模式开启", SwingConstants.CENTER);
 
     /** 是否处于步控模式（←→键控制棋子逐格移动）。 */
@@ -67,9 +70,13 @@ public class GameWindow extends JFrame {
         JPanel bottom = new JPanel(new FlowLayout());
         bottom.add(infoLabel);
         bottom.add(rollDiceBtn);
+        bottom.add(singleDoubleBtn);
+        bottom.add(doubleSumBtn);
         add(bottom, BorderLayout.SOUTH);
 
         rollDiceBtn.addActionListener((ActionEvent e) -> controller.requestDiceRoll());
+        singleDoubleBtn.addActionListener((ActionEvent e) -> controller.requestDualDiceRoll(1));
+        doubleSumBtn.addActionListener((ActionEvent e) -> controller.requestDualDiceRoll(2));
 
         // 调试功能：按 G 键弹出骰子输入框（仅 DEBUG_MODE=true 时启用）
         if (DEBUG_MODE) {
@@ -112,7 +119,18 @@ public class GameWindow extends JFrame {
         boardPanel.setGameState(state);
         if (state != null && state.getPhase() == GamePhase.SUDDEN_DEATH) {
             suddenDeathBanner.setVisible(true);
+            // 进入突然死亡模式后切换至双骰按钮
+            showDualDiceButtons(true);
+        } else {
+            showDualDiceButtons(false);
         }
+    }
+
+    /** 切换正常掷骰与双骰按钮显隐。 */
+    private void showDualDiceButtons(boolean dual) {
+        rollDiceBtn.setVisible(!dual);
+        singleDoubleBtn.setVisible(dual);
+        doubleSumBtn.setVisible(dual);
     }
 
     /** 设置最近一次掷骰结果及掷骰者，用于在可移动棋子上显示悬停黑圈。 */
@@ -131,6 +149,8 @@ public class GameWindow extends JFrame {
 
     public void setDiceEnabled(boolean enabled) {
         rollDiceBtn.setEnabled(enabled);
+        singleDoubleBtn.setEnabled(enabled);
+        doubleSumBtn.setEnabled(enabled);
     }
 
     // ===== 突然死亡模式步控 =====
@@ -139,6 +159,8 @@ public class GameWindow extends JFrame {
     public void enterStepControlMode() {
         stepControlActive = true;
         rollDiceBtn.setEnabled(false);
+        singleDoubleBtn.setEnabled(false);
+        doubleSumBtn.setEnabled(false);
         boardPanel.setStepControlActive(true);
     }
 

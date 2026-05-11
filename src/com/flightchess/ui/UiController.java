@@ -214,6 +214,11 @@ public class UiController {
         send(new Message(MessageType.DICE_ROLL_REQUEST, roomId, playerId, 0L, null));
     }
 
+    /** 突然死亡模式：发送双骰掷骰请求，mode=1（单骰×2）或 mode=2（双骰相加）。 */
+    public void requestDualDiceRoll(int mode) {
+        send(new Message(MessageType.DUAL_DICE_ROLL, roomId, playerId, 0L, mode));
+    }
+
     /** 选择要移动的棋子并发送到服务器（掷骰后由用户点击棋子触发）。 */
     public void requestMove(int pieceIndex) {
         send(new Message(MessageType.MOVE_REQUEST, roomId, playerId, 0L, pieceIndex));
