@@ -162,13 +162,24 @@ public class RuleEngine {
         CellType targetType = CellType.values()[targetCellTypeOrdinal];
 
         // 吃子：目标位置若有敌方棋子则全部打回等待区
+        List<Piece> enemiesAtTarget = new ArrayList<>();
         for (Player p : state.getPlayersInOrder()) {
             if (p.getColor() == color) continue;
             for (Piece enemy : p.getPieces()) {
                 if (enemy.getCellType() == targetType && enemy.getPositionIndex() == targetPosition) {
-                    enemy.setCellType(CellType.WAITING_AREA);
-                    enemy.setPositionIndex(-1);
+                    enemiesAtTarget.add(enemy);
                 }
+            }
+        }
+        if (!enemiesAtTarget.isEmpty()) {
+            for (Piece enemy : enemiesAtTarget) {
+                enemy.setCellType(CellType.WAITING_AREA);
+                enemy.setPositionIndex(-1);
+            }
+            if (enemiesAtTarget.size() >= 2) {
+                piece.setCellType(CellType.WAITING_AREA);
+                piece.setPositionIndex(-1);
+                return true;
             }
         }
 
@@ -221,6 +232,11 @@ public class RuleEngine {
                     enemy.setCellType(CellType.DEAD);
                     enemy.setPositionIndex(-1);
                 }
+                if (capturedPieces.size() >= 2) {
+                    piece.setCellType(CellType.DEAD);
+                    piece.setPositionIndex(-1);
+                    return MoveResult.success(true);
+                }
             }
             // 航道入口跳转：落在外圈局部索引7且颜色匹配 → 跳到下一quarter局部索引6
             if (BoardConfig.isAirRouteEntry(to) && color == BoardConfig.getCellColorAtOuterIndex(to)) {
@@ -232,6 +248,11 @@ public class RuleEngine {
                     for (Piece enemy : airCaptured) {
                         enemy.setCellType(CellType.DEAD);
                         enemy.setPositionIndex(-1);
+                    }
+                    if (airCaptured.size() >= 2) {
+                        piece.setCellType(CellType.DEAD);
+                        piece.setPositionIndex(-1);
+                        return MoveResult.success(true);
                     }
                 }
             }
@@ -245,6 +266,11 @@ public class RuleEngine {
                     for (Piece enemy : jumpCaptured) {
                         enemy.setCellType(CellType.DEAD);
                         enemy.setPositionIndex(-1);
+                    }
+                    if (jumpCaptured.size() >= 2) {
+                        piece.setCellType(CellType.DEAD);
+                        piece.setPositionIndex(-1);
+                        return MoveResult.success(true);
                     }
                 }
             }
@@ -264,6 +290,11 @@ public class RuleEngine {
                     enemy.setCellType(CellType.DEAD);
                     enemy.setPositionIndex(-1);
                 }
+                if (capturedPieces.size() >= 2) {
+                    piece.setCellType(CellType.DEAD);
+                    piece.setPositionIndex(-1);
+                    return MoveResult.success(true);
+                }
             }
             // 航道入口跳转：落在外圈局部索引7且颜色匹配 → 跳到下一quarter局部索引6
             if (BoardConfig.isAirRouteEntry(to) && color == BoardConfig.getCellColorAtOuterIndex(to)) {
@@ -275,6 +306,11 @@ public class RuleEngine {
                     for (Piece enemy : airCaptured) {
                         enemy.setCellType(CellType.DEAD);
                         enemy.setPositionIndex(-1);
+                    }
+                    if (airCaptured.size() >= 2) {
+                        piece.setCellType(CellType.DEAD);
+                        piece.setPositionIndex(-1);
+                        return MoveResult.success(true);
                     }
                 }
             }
@@ -288,6 +324,11 @@ public class RuleEngine {
                     for (Piece enemy : jumpCaptured) {
                         enemy.setCellType(CellType.DEAD);
                         enemy.setPositionIndex(-1);
+                    }
+                    if (jumpCaptured.size() >= 2) {
+                        piece.setCellType(CellType.DEAD);
+                        piece.setPositionIndex(-1);
+                        return MoveResult.success(true);
                     }
                 }
             }
