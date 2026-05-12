@@ -281,7 +281,8 @@ public class RuleEngine {
             }
         } else if (piece.getCellType() == CellType.OUTER) {
             int from = piece.getPositionIndex();
-            int to = BoardConfig.moveForwardOnOuter(from, dice);
+            int effectiveDice = dice * getDoubleZoneMultiplier(state, from);
+            int to = BoardConfig.moveForwardOnOuter(from, effectiveDice);
             // 先吃子（若落点有敌人），再判断航道和同色跳格
             Set<Piece> capturedPieces = getPiecesAtOuterIndex(state, to, color, false);
             if (!capturedPieces.isEmpty()) {
@@ -363,6 +364,22 @@ public class RuleEngine {
             }
         }
         return count;
+    }
+
+    /**
+     * 计算双倍区倍率：若 outerIndex 在死亡玩家的双倍区内，返回对应倍率。
+     * 多名死亡玩家区域叠加时倍率相乘。仅在普通模式下生效，突然死亡模式返回 1。
+     */
+    private int getDoubleZoneMultiplier(GameState state, int outerIndex) {
+        if (state.getPhase() != GamePhase.NORMAL) return 1;
+        int multiplier = 1;
+        for (PlayerColor color : PlayerColor.ordered()) {
+            if (state.isPlayerDead(color)
+                    && BoardConfig.getDoubleZoneFor(color).contains(outerIndex)) {
+                multiplier *= 2;
+            }
+        }
+        return multiplier;
     }
 
     /**
